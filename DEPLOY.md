@@ -31,7 +31,7 @@ Configure these repository secrets before enabling deployment:
 - `SERVER_HOST`
 - `SERVER_PORT`
 - `SERVER_USER`
-- `SERVER_SSH_KEY`
+- `SERVER_SSH_KEY_B64`
 - `SERVER_TARGET_DIR`
 
 This project should use these values:
@@ -43,7 +43,13 @@ SERVER_USER=ubuntu
 SERVER_TARGET_DIR=/var/www/qn-message.com
 ```
 
-`SERVER_SSH_KEY` should be the private key whose public key has been added to `/home/ubuntu/.ssh/authorized_keys` on the server.
+`SERVER_SSH_KEY_B64` should be the base64-encoded content of the private key whose public key has been added to `/home/ubuntu/.ssh/authorized_keys` on the server.
+
+On Windows PowerShell you can generate that value with:
+
+```powershell
+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content $HOME\.ssh\yantai_radar_deploy -Raw)))
+```
 
 ## GitHub setup
 
