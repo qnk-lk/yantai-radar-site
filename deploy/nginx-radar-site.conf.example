@@ -1,8 +1,8 @@
 server {
   listen 80;
-  server_name radar.example.com;
+  server_name qn-message.com www.qn-message.com;
 
-  root /var/www/radar;
+  root /var/www/qn-message.com;
   index index.html;
 
   location / {
