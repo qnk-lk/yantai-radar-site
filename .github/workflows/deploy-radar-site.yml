@@ -50,4 +50,4 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_TARGET_DIR: ${{ secrets.SERVER_TARGET_DIR }}
         run: |
-          rsync -avz --delete -e "ssh -p ${SERVER_PORT:-22}" out/ "${SERVER_USER}@${SERVER_HOST}:${SERVER_TARGET_DIR}/"
+          rsync -avz --delete --exclude latest.json -e "ssh -p ${SERVER_PORT:-22}" out/ "${SERVER_USER}@${SERVER_HOST}:${SERVER_TARGET_DIR}/"

@@ -134,7 +134,7 @@ After building locally, you can publish the static export with:
 
 ```bash
 pnpm build
-rsync -avz --delete -e "ssh -p 22" out/ ubuntu@129.226.217.104:/var/www/qn-message.com/
+rsync -avz --delete --exclude latest.json -e "ssh -p 22" out/ ubuntu@129.226.217.104:/var/www/qn-message.com/
 ```
 
 ## HTTPS
@@ -155,3 +155,37 @@ You can update that file by:
 
 - generating a new JSON file locally and pushing it with the site
 - or writing a server-side script that overwrites `latest.json` after OpenClaw completes the daily report
+
+## OpenClaw bridge
+
+This repo includes a bridge script that converts the latest OpenClaw cron summary into the site JSON format:
+
+- [scripts/openclaw_summary_to_latest_json.py](/C:/Users/62404/Desktop/yantai-radar-site/scripts/openclaw_summary_to_latest_json.py)
+- [scripts/sync-openclaw-latest.sh](/C:/Users/62404/Desktop/yantai-radar-site/scripts/sync-openclaw-latest.sh)
+
+Recommended server-side setup:
+
+```bash
+mkdir -p /home/ubuntu/openclaw-bridge
+```
+
+Copy the scripts to the server, then run:
+
+```bash
+chmod +x /home/ubuntu/openclaw-bridge/sync-openclaw-latest.sh
+/home/ubuntu/openclaw-bridge/sync-openclaw-latest.sh
+```
+
+Recommended cron entry:
+
+```bash
+*/10 * * * * /home/ubuntu/openclaw-bridge/sync-openclaw-latest.sh >> /home/ubuntu/openclaw-bridge/sync.log 2>&1
+```
+
+The script reads the newest finished file from `/home/ubuntu/.openclaw/cron/runs/` and rewrites:
+
+```text
+/var/www/qn-message.com/latest.json
+```
+
+The deploy workflow intentionally excludes `latest.json`, so site code updates will not overwrite the newest OpenClaw-generated data on the server.

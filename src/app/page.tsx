@@ -26,6 +26,7 @@ type RadarData = {
   highPriority: RadarEntry[];
   potentialLeads: RadarEntry[];
   watchItems: RadarEntry[];
+  coverageGaps: string[];
   nextActions: string[];
   accounts: RadarEntry[];
 };
@@ -40,6 +41,7 @@ const fallbackData: RadarData = {
   highPriority: [],
   potentialLeads: [],
   watchItems: [],
+  coverageGaps: [],
   nextActions: [
     "确认域名 DNS 指向新加坡服务器。",
     "将 GitHub Actions 的部署密钥和服务器目录配置完成。",
@@ -301,6 +303,28 @@ export default function Home() {
               entries={data.watchItems}
               emptyLabel="今日暂无新的重点企业或竞对动作。"
             />
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
+          <SectionHeader
+            eyebrow="Coverage Gaps"
+            title="今日未覆盖 / 证据不足"
+            description="把尚未核实完成的城市、主题和对象保留下来，方便第二天继续补查。"
+          />
+          <div className="mt-6 grid gap-3">
+            {data.coverageGaps.length ? (
+              data.coverageGaps.map((gap) => (
+                <div
+                  key={gap}
+                  className="rounded-[1.25rem] border border-[var(--color-line)] bg-[var(--color-card-soft)] px-4 py-4 text-sm leading-7 text-[var(--color-ink)]"
+                >
+                  {gap}
+                </div>
+              ))
+            ) : (
+              <EmptyState label="今日暂无额外的未覆盖或证据不足项。" />
+            )}
           </div>
         </section>
 

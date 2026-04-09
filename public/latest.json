@@ -8,6 +8,7 @@
   "highPriority": [],
   "potentialLeads": [],
   "watchItems": [],
+  "coverageGaps": [],
   "nextActions": [
     "配置 GitHub 仓库 Secrets，把构建后的静态文件推送到服务器站点目录。",
     "把域名子域名指向当前服务器，并配置 Nginx 和 HTTPS。",
