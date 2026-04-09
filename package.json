@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "pnpm dlx serve out -l 4173",
+    "preview": "pnpm dlx serve out -l 4173",
     "lint": "eslint"
   },
   "dependencies": {

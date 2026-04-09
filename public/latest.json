@@ -1,0 +1,17 @@
+{
+  "updatedAt": "等待首次自动同步",
+  "summary": {
+    "focus": "烟台优先，向青岛、威海、潍坊扩展，再补山东重点制造城市。",
+    "status": "当前站点已就绪，等待 OpenClaw 每日任务产出。",
+    "note": "后续可由自动化任务把日报结果转成 latest.json，这一页会自动刷新展示最新内容。"
+  },
+  "highPriority": [],
+  "potentialLeads": [],
+  "watchItems": [],
+  "nextActions": [
+    "配置 GitHub 仓库 Secrets，把构建后的静态文件推送到服务器站点目录。",
+    "把域名子域名指向当前服务器，并配置 Nginx 和 HTTPS。",
+    "准备一个脚本，把 OpenClaw 日报结果转成 latest.json 覆盖当前示例数据。"
+  ],
+  "accounts": []
+}

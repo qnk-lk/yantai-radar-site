@@ -1,0 +1,17 @@
+server {
+  listen 80;
+  server_name radar.example.com;
+
+  root /var/www/radar;
+  index index.html;
+
+  location / {
+    try_files $uri $uri.html $uri/ =404;
+  }
+
+  location = /404.html {
+    internal;
+  }
+
+  error_page 404 /404.html;
+}
