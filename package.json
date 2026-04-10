@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-dev-with-lan-ip.ps1",
     "build": "next build",
     "start": "pnpm dlx serve out -l 4173",
     "preview": "pnpm dlx serve out -l 4173",
     "lint": "eslint",
-    "api:start": "node server/index.mjs",
-    "api:dev": "node --watch server/index.mjs"
+    "api:start": "node server/index.mjs --host 0.0.0.0",
+    "api:dev": "node --watch server/index.mjs --host 0.0.0.0"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",

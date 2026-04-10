@@ -3,6 +3,28 @@ import Fastify from "fastify";
 
 import { initializeStore, readDocument, resolveConfig } from "./lib/store.mjs";
 
+function parseCliArgs(argv) {
+  const options = {};
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const current = argv[index];
+    const next = argv[index + 1];
+
+    if (current === "--host" && next) {
+      options.host = next;
+      index += 1;
+      continue;
+    }
+
+    if (current === "--port" && next) {
+      options.port = Number(next);
+      index += 1;
+    }
+  }
+
+  return options;
+}
+
 function buildApp(config, db) {
   const app = Fastify({
     logger: true,
@@ -73,7 +95,12 @@ function buildApp(config, db) {
   return app;
 }
 
-const config = resolveConfig();
+const cliOptions = parseCliArgs(process.argv.slice(2));
+const config = {
+  ...resolveConfig(),
+  ...(cliOptions.host ? { host: cliOptions.host } : {}),
+  ...(Number.isFinite(cliOptions.port) ? { port: cliOptions.port } : {}),
+};
 const database = await initializeStore(config);
 const app = buildApp(config, database);
 

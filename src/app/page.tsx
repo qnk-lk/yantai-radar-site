@@ -72,6 +72,11 @@ const fallbackCompetitorData: CompetitorData = {
 };
 
 const fallbackAdminIndex: ChinaAdminIndex = {};
+const publicApiBaseUrl = process.env.NEXT_PUBLIC_RADAR_API_BASE_URL?.replace(/\/$/, "") ?? "";
+
+function withApiBase(path: string) {
+  return publicApiBaseUrl ? `${publicApiBaseUrl}${path}` : path;
+}
 
 async function loadJson<T>(url: string): Promise<T> {
   const response = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
@@ -244,10 +249,10 @@ export default function Home() {
 
     async function loadData() {
       const [radarResult, competitorResult, adminIndexResult] = await Promise.allSettled([
-        loadJsonWithFallback<RadarData>(["/api/radar/latest", "/latest.json"]),
-        loadJsonWithFallback<CompetitorData>(["/api/competitors", "/competitors.json"]),
+        loadJsonWithFallback<RadarData>([withApiBase("/api/radar/latest"), "/latest.json"]),
+        loadJsonWithFallback<CompetitorData>([withApiBase("/api/competitors"), "/competitors.json"]),
         loadJsonWithFallback<ChinaAdminIndex>([
-          "/api/admin/divisions",
+          withApiBase("/api/admin/divisions"),
           "/china-admin-divisions.json",
         ]),
       ]);
