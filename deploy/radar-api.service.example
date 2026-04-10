@@ -1,0 +1,20 @@
+[Unit]
+Description=Yantai Radar API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/yantai-radar-site/server
+Environment=NODE_ENV=production
+Environment=RADAR_API_HOST=127.0.0.1
+Environment=RADAR_API_PORT=3180
+Environment=RADAR_DATA_DIR=/var/www/qn-message.com
+Environment=RADAR_DB_PATH=/home/ubuntu/yantai-radar-site/server/data/radar.sqlite
+ExecStart=/usr/bin/env node /home/ubuntu/yantai-radar-site/server/index.mjs
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,149 @@
+{
+  "updatedAt": "2026-04-10 10:09:53 CST",
+  "status": "已同步 6 家烟台 / 青岛制造服务同行公司。",
+  "note": "当前结果只保留 烟台 / 青岛 两地同行；后续可继续补强公司证据与最新动态。",
+  "baseline": {
+    "companyName": "烟台市利道软件科技有限公司",
+    "serviceScopeSummary": "公开服务范围集中在制造业数字化工厂与智能制造落地，覆盖MOM平台、MES、WMS、QMS、APS、TPM、SCM等，并展示电子组装、半导体、汽车电子、汽车零部件、新能源、装备制造等行业案例。",
+    "evidence": [
+      {
+        "source": "官网首页",
+        "url": "https://www.lidaotech.com/",
+        "note": "首页标题直接写明“MES系统-MOM平台-生产管理系统-数字化工厂-WMS”；正文写明“一站式数字化工厂解决方案服务商”，并列出MES、WMS、QMS、APS、TPM、SCM等产品模块及电子组装、半导体、汽车电子、汽车零部件、新能源、装备制造行业案例。"
+      },
+      {
+        "source": "智联招聘职位页",
+        "url": "https://www.zhaopin.com/jobdetail/CC448426330J40843396610.htm",
+        "note": "招聘“初中级MES开发 java工程师”，公司介绍写明长期从事电子行业、汽车行业等领域开发与改善研究。"
+      }
+    ]
+  },
+  "competitors": [
+    {
+      "rank": 1,
+      "companyName": "山东捷瑞数字科技股份有限公司",
+      "city": "烟台",
+      "distanceTier": "烟台本地",
+      "serviceFit": "中",
+      "manufacturingFocus": "数字孪生工厂、智慧能源、装备制造与能源化工等行业数字化转型",
+      "coreServices": [
+        "数字孪生工厂",
+        "企业数字化转型咨询与解决方案"
+      ],
+      "whyRelevant": "同属烟台本地，明确面向制造业与工业场景提供数字化工厂/数字孪生工厂方案，虽然不以MES/WMS/QMS命名为主，但在工厂数字化与工业软件实施层面与利道存在重叠。",
+      "evidenceStrength": "中",
+      "evidence": [
+        {
+          "source": "官网首页",
+          "url": "https://www.jerei.com/",
+          "note": "首页标题含“数字孪生工厂”；正文写明“新一代信息技术与制造业融合发展试点示范企业”，并称在数字孪生工厂、智慧能源管理等业务领域提供数字化转型咨询与产品解决方案。"
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "companyName": "青岛中科华智信息科技有限公司",
+      "city": "青岛",
+      "distanceTier": "青岛重点",
+      "serviceFit": "高",
+      "manufacturingFocus": "制造业生产过程管理、质量追溯、物料与设备管理",
+      "coreServices": [
+        "MES制造执行系统",
+        "ERP/WMS相关数字化方案"
+      ],
+      "whyRelevant": "公开产品页明确面向制造企业提供MES，且与ERP/WMS协同，和利道在制造执行、质量追溯、生产过程管理上高度同类。",
+      "evidenceStrength": "高",
+      "evidence": [
+        {
+          "source": "MES产品页",
+          "url": "http://www.zhongkehuazhi.com/products/mes.html",
+          "note": "页面标题含“青岛MES厂商-SAP MES系统-企业MES生产过程管理系统-MES制造执行系统”；正文写明涵盖生产计划、过程管控、质量追溯、物料管理、设备管理等制造场景。"
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "companyName": "青岛天成信息科技有限公司",
+      "city": "青岛",
+      "distanceTier": "青岛重点",
+      "serviceFit": "高",
+      "manufacturingFocus": "制造业MES、WMS、QMS、TPM与数据追溯",
+      "coreServices": [
+        "MES/WMS/QMS系统解决方案",
+        "生产数据追溯与设备数据采集"
+      ],
+      "whyRelevant": "官网直接声明“为制造业提供专业的MES、WMS、QMS、TPM等系统解决方案”，和利道的产品谱系几乎正面对标。",
+      "evidenceStrength": "高",
+      "evidence": [
+        {
+          "source": "官网首页",
+          "url": "http://www.qdtckj.com/",
+          "note": "首页标题为“青岛天成信息科技MES系统-生产管理系统-WMS系统仓储管理系统”；正文写明“为制造业提供专业的MES、WMS、QMS、TPM等系统解决方案”，并列出生产管理、数据追溯、仓库管理、质量管理、设备管理、数据采集等。"
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "companyName": "青岛凯航科技有限公司",
+      "city": "青岛",
+      "distanceTier": "青岛重点",
+      "serviceFit": "中",
+      "manufacturingFocus": "企业ERP与MES管理软件",
+      "coreServices": [
+        "ERP管理软件",
+        "MES管理软件"
+      ],
+      "whyRelevant": "虽ERP色彩较重，但公开文章与站点定位已延伸到MES管理软件，属于制造业管理软件交叉竞争者。",
+      "evidenceStrength": "中",
+      "evidence": [
+        {
+          "source": "官网文章页",
+          "url": "http://www.qdyonyou.net/?cjwt/373.html",
+          "note": "页面标题为“青岛MES管理软件助力产业发展！ - 青岛凯航科技有限公司”；正文写明“青岛MES管理软件系统”并介绍实时数据采集与监控等MES功能模块。"
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "companyName": "卡奥斯物联科技股份有限公司",
+      "city": "青岛",
+      "distanceTier": "青岛重点",
+      "serviceFit": "高",
+      "manufacturingFocus": "电子、家电、汽车汽配、化工等行业制造运营与数字化工厂",
+      "coreServices": [
+        "制造运营解决方案/MOM",
+        "工业互联网平台与设备互联"
+      ],
+      "whyRelevant": "青岛头部工业互联网平台，明确提供电子行业智能制造执行系统、PCBA数字化工厂、MOM等，面向制造业大型客户，与利道在智能工厂赛道直接交叉。",
+      "evidenceStrength": "高",
+      "evidence": [
+        {
+          "source": "官网首页",
+          "url": "https://www.cosmoplat.com/",
+          "note": "首页写明“助力企业数字化转型”，列出“电子行业智能制造执行系统”“PCBA行业数字化工厂解决方案”“电子行业MOM解决方案”“汽车汽配制造运营解决方案”等。"
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "companyName": "青岛卡奥斯工业智能研究院有限公司",
+      "city": "青岛",
+      "distanceTier": "青岛重点",
+      "serviceFit": "中",
+      "manufacturingFocus": "电子、家电、汽车汽配、化工等制造行业的MOM与数字化工厂方案研发落地",
+      "coreServices": [
+        "MOM/制造运营解决方案",
+        "行业数字化工厂方案"
+      ],
+      "whyRelevant": "如果按青岛本地工业智能实施主体看，卡奥斯体系内的工业智能研究与方案交付能力对利道同样构成竞争，尤其在中大型制造项目。",
+      "evidenceStrength": "中",
+      "evidence": [
+        {
+          "source": "卡奥斯官网首页",
+          "url": "https://www.cosmoplat.com/",
+          "note": "官网公开展示电子行业智能制造执行系统、PCBA行业数字化工厂、电子行业MOM、汽车汽配制造运营、化工行业智慧云工厂等方案，体现其工业智能与制造运营能力。"
+        }
+      ]
+    }
+  ]
+}

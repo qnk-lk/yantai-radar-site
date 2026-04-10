@@ -41,3 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local backend data
+/server/data/
+.radar-api.log
+.radar-api.err.log

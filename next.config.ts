@@ -7,6 +7,7 @@ const currentDir = path.dirname(currentFilePath);
 
 const nextConfig: NextConfig = {
   output: "export",
+  transpilePackages: ["echarts", "zrender"],
   turbopack: {
     root: currentDir,
   },
