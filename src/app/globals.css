@@ -43,3 +43,108 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+.competitor-leaflet-map {
+  height: 31rem;
+  width: 100%;
+  background:
+    linear-gradient(180deg, rgba(233, 243, 250, 0.9), rgba(224, 214, 197, 0.92)),
+    #f4ede2;
+}
+
+.competitor-leaflet-map .leaflet-control-zoom {
+  border: 1px solid rgba(167, 128, 94, 0.28);
+  box-shadow: 0 10px 24px rgba(69, 49, 28, 0.12);
+}
+
+.competitor-leaflet-map .leaflet-control-zoom a {
+  color: var(--color-ink);
+  background: rgba(255, 250, 241, 0.96);
+}
+
+.competitor-leaflet-map .leaflet-control-attribution {
+  background: rgba(255, 250, 241, 0.9);
+  color: var(--color-muted);
+}
+
+.competitor-marker-shell {
+  background: transparent;
+  border: 0;
+}
+
+.competitor-marker {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #c73822;
+  border: 2px solid rgba(255, 250, 241, 0.95);
+  box-shadow: 0 0 0 1px rgba(143, 38, 22, 0.18);
+}
+
+.competitor-marker::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 999px;
+  border: 2px solid rgba(199, 56, 34, 0.3);
+  animation: competitor-pulse 1.9s ease-out infinite;
+}
+
+.competitor-marker.is-selected {
+  width: 18px;
+  height: 18px;
+  background: #9f2212;
+  box-shadow: 0 0 0 2px rgba(159, 34, 18, 0.16);
+}
+
+.competitor-marker.is-selected::after {
+  inset: -8px;
+  border-color: rgba(159, 34, 18, 0.4);
+}
+
+.competitor-marker-baseline {
+  width: 16px;
+  height: 16px;
+  background: #2f8e4f;
+  box-shadow: 0 0 0 1px rgba(34, 107, 58, 0.22);
+}
+
+.competitor-marker-baseline::after {
+  inset: -8px;
+  border-color: rgba(47, 142, 79, 0.34);
+}
+
+.competitor-map-tooltip {
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(69, 49, 28, 0.14);
+}
+
+.competitor-map-tooltip-baseline {
+  color: #245f38;
+}
+
+.competitor-map-tooltip .leaflet-tooltip-content {
+  margin: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@keyframes competitor-pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+
+  70% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}

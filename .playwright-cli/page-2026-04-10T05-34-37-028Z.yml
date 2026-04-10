@@ -1,0 +1,248 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e7]:
+      - img [ref=e8]
+    - generic [ref=e11]:
+      - button "Open issues overlay" [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: "0"
+          - generic [ref=e15]: "1"
+        - generic [ref=e16]: Issue
+      - button "Collapse issues badge" [ref=e17]:
+        - img [ref=e18]
+  - main [ref=e20]:
+    - generic [ref=e22]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e28]:
+              - generic [ref=e29]:
+                - paragraph [ref=e30]: 烟台开发区
+                - paragraph [ref=e31]: 4月10日周五 13:34:36
+              - generic [ref=e32]:
+                - img [ref=e33]
+                - generic [ref=e35]: 正在获取位置...
+            - generic [ref=e36]:
+              - paragraph [ref=e37]: 语言
+              - generic [ref=e38]:
+                - log [ref=e40]
+                - generic [ref=e41]:
+                  - generic [ref=e42]:
+                    - generic [ref=e44]:
+                      - img [ref=e45]
+                      - generic [ref=e46]: 中文
+                    - combobox [ref=e47]
+                  - img [ref=e51]
+          - generic [ref=e53]: 烟台制造信号室
+          - generic [ref=e54]:
+            - heading "烟台优先的制造业销售雷达 同时补一张“烟台 / 青岛同行地图”，让你知道谁在和你抢客户。" [level=1] [ref=e55]:
+              - text: 烟台优先的制造业销售雷达
+              - generic [ref=e56]: 同时补一张“烟台 / 青岛同行地图”，让你知道谁在和你抢客户。
+            - paragraph [ref=e57]: 这页不是新闻堆叠，而是把销售线索、同行公司、跟进动作和证据缺口放进同一个面板，让你先判断再行动。
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - paragraph [ref=e60]: 高优线索
+              - paragraph [ref=e61]: "0"
+              - paragraph [ref=e62]: 今天值得立刻跟进的对象数。
+            - generic [ref=e63]:
+              - paragraph [ref=e64]: 潜在线索
+              - paragraph [ref=e65]: "0"
+              - paragraph [ref=e66]: 保留早期信号，便于持续跟进。
+            - generic [ref=e67]:
+              - paragraph [ref=e68]: 同行公司
+              - paragraph [ref=e69]: "6"
+              - paragraph [ref=e70]: 只统计烟台与青岛范围内的同行样本。
+            - generic [ref=e71]:
+              - paragraph [ref=e72]: 明日动作
+              - paragraph [ref=e73]: "3"
+              - paragraph [ref=e74]: 已转成下一步执行清单。
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - paragraph [ref=e77]: 当前焦点
+            - paragraph [ref=e78]: 烟台优先，向青岛、威海、潍坊扩展，再补山东重点制造城市。
+          - generic [ref=e79]:
+            - paragraph [ref=e80]: 今日状态
+            - paragraph [ref=e81]: 当前站点已就绪，等待 OpenClaw 每日任务产出。
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e84]:
+                - paragraph [ref=e85]: 同行地图
+                - heading "烟台 / 青岛同行分布" [level=3] [ref=e86]
+              - generic [ref=e87]:
+                - generic [ref=e88]: 烟台 1 家
+                - generic [ref=e89]: 青岛 5 家
+            - generic [ref=e91]:
+              - generic:
+                - generic:
+                  - button [ref=e92] [cursor=pointer]
+                  - button [ref=e94] [cursor=pointer]
+                  - button [ref=e96] [cursor=pointer]
+                  - button [ref=e98] [cursor=pointer]
+                  - button [ref=e100] [cursor=pointer]
+                  - button [ref=e102] [cursor=pointer]
+                  - button [ref=e104] [cursor=pointer]
+              - generic:
+                - generic [ref=e106]:
+                  - button "Zoom in" [ref=e107] [cursor=pointer]: +
+                  - button "Zoom out" [ref=e108] [cursor=pointer]: −
+                - generic [ref=e109]:
+                  - link "Leaflet" [ref=e110] [cursor=pointer]:
+                    - /url: https://leafletjs.com
+                    - img [ref=e111]
+                    - text: Leaflet
+                  - text: "| ©"
+                  - link "OpenStreetMap" [ref=e115] [cursor=pointer]:
+                    - /url: https://www.openstreetmap.org/copyright
+            - generic [ref=e116]:
+              - generic [ref=e117]: 已同步 6 家烟台 / 青岛制造服务同行公司。
+              - generic [ref=e118]:
+                - paragraph [ref=e119]: 当前结果只保留 烟台 / 青岛 两地同行；后续可继续补强公司证据与最新动态。
+                - paragraph [ref=e120]: 更新时间：2026-04-10 10:09:53 CST
+      - generic [ref=e121]:
+        - generic [ref=e122]:
+          - paragraph [ref=e123]: 同行名片
+          - generic [ref=e124]:
+            - heading "烟台 / 青岛同行公司名片" [level=2] [ref=e125]
+            - paragraph [ref=e126]: 地图负责空间感，右侧名片负责细节。默认收起，点箭头或点地图点位再展开。
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - generic [ref=e130]:
+              - paragraph [ref=e131]: 对标基准
+              - heading "烟台市利道软件科技有限公司" [level=3] [ref=e132]
+              - paragraph [ref=e133]: 公开服务范围集中在制造业数字化工厂与智能制造落地，覆盖MOM平台、MES、WMS、QMS、APS、TPM、SCM等，并展示电子组装、半导体、汽车电子、汽车零部件、新能源、装备制造等行业案例。
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - link "官网首页" [ref=e137] [cursor=pointer]:
+                    - /url: https://www.lidaotech.com/
+                  - paragraph [ref=e138]: 首页标题直接写明“MES系统-MOM平台-生产管理系统-数字化工厂-WMS”；正文写明“一站式数字化工厂解决方案服务商”，并列出MES、WMS、QMS、APS、TPM、SCM等产品模块及电子组装、半导体、汽车电子、汽车零部件、新能源、装备制造行业案例。
+                - generic [ref=e139]:
+                  - link "智联招聘职位页" [ref=e140] [cursor=pointer]:
+                    - /url: https://www.zhaopin.com/jobdetail/CC448426330J40843396610.htm
+                  - paragraph [ref=e141]: 招聘“初中级MES开发 java工程师”，公司介绍写明长期从事电子行业、汽车行业等领域开发与改善研究。
+            - generic [ref=e142]:
+              - generic [ref=e143]:
+                - paragraph [ref=e144]: 烟台本地
+                - paragraph [ref=e145]: "1"
+                - paragraph [ref=e146]: 山东捷瑞数字科技股份有限公司
+              - generic [ref=e147]:
+                - paragraph [ref=e148]: 青岛重点
+                - paragraph [ref=e149]: "5"
+                - paragraph [ref=e150]: 青岛中科华智信息科技有限公司、青岛天成信息科技有限公司、青岛凯航科技有限公司、卡奥斯物联科技股份有限公司、青岛卡奥斯工业智能研究院有限公司
+          - generic [ref=e151]:
+            - generic [ref=e152]:
+              - generic [ref=e153]:
+                - heading "烟台本地" [level=3] [ref=e154]
+                - generic [ref=e155]: "1"
+              - article [ref=e157]:
+                - button "#1 烟台 匹配度 中 山东捷瑞数字科技股份有限公司 数字孪生工厂、智慧能源、装备制造与能源化工等行业数字化转型" [ref=e158]:
+                  - generic [ref=e159]:
+                    - generic [ref=e160]:
+                      - generic [ref=e161]: "#1"
+                      - generic [ref=e162]: 烟台
+                      - generic [ref=e163]: 匹配度 中
+                    - heading "山东捷瑞数字科技股份有限公司" [level=4] [ref=e164]
+                    - paragraph [ref=e165]: 数字孪生工厂、智慧能源、装备制造与能源化工等行业数字化转型
+                  - generic [ref=e166]: ›
+            - generic [ref=e167]:
+              - generic [ref=e168]:
+                - heading "青岛重点" [level=3] [ref=e169]
+                - generic [ref=e170]: "5"
+              - generic [ref=e171]:
+                - article [ref=e172]:
+                  - button "#2 青岛 匹配度 高 青岛中科华智信息科技有限公司 制造业生产过程管理、质量追溯、物料与设备管理" [ref=e173]:
+                    - generic [ref=e174]:
+                      - generic [ref=e175]:
+                        - generic [ref=e176]: "#2"
+                        - generic [ref=e177]: 青岛
+                        - generic [ref=e178]: 匹配度 高
+                      - heading "青岛中科华智信息科技有限公司" [level=4] [ref=e179]
+                      - paragraph [ref=e180]: 制造业生产过程管理、质量追溯、物料与设备管理
+                    - generic [ref=e181]: ›
+                - article [ref=e182]:
+                  - button "#3 青岛 匹配度 高 青岛天成信息科技有限公司 制造业MES、WMS、QMS、TPM与数据追溯" [ref=e183]:
+                    - generic [ref=e184]:
+                      - generic [ref=e185]:
+                        - generic [ref=e186]: "#3"
+                        - generic [ref=e187]: 青岛
+                        - generic [ref=e188]: 匹配度 高
+                      - heading "青岛天成信息科技有限公司" [level=4] [ref=e189]
+                      - paragraph [ref=e190]: 制造业MES、WMS、QMS、TPM与数据追溯
+                    - generic [ref=e191]: ›
+                - article [ref=e192]:
+                  - button "#4 青岛 匹配度 中 青岛凯航科技有限公司 企业ERP与MES管理软件" [ref=e193]:
+                    - generic [ref=e194]:
+                      - generic [ref=e195]:
+                        - generic [ref=e196]: "#4"
+                        - generic [ref=e197]: 青岛
+                        - generic [ref=e198]: 匹配度 中
+                      - heading "青岛凯航科技有限公司" [level=4] [ref=e199]
+                      - paragraph [ref=e200]: 企业ERP与MES管理软件
+                    - generic [ref=e201]: ›
+                - article [ref=e202]:
+                  - button "#5 青岛 匹配度 高 卡奥斯物联科技股份有限公司 电子、家电、汽车汽配、化工等行业制造运营与数字化工厂" [ref=e203]:
+                    - generic [ref=e204]:
+                      - generic [ref=e205]:
+                        - generic [ref=e206]: "#5"
+                        - generic [ref=e207]: 青岛
+                        - generic [ref=e208]: 匹配度 高
+                      - heading "卡奥斯物联科技股份有限公司" [level=4] [ref=e209]
+                      - paragraph [ref=e210]: 电子、家电、汽车汽配、化工等行业制造运营与数字化工厂
+                    - generic [ref=e211]: ›
+                - article [ref=e212]:
+                  - button "#6 青岛 匹配度 中 青岛卡奥斯工业智能研究院有限公司 电子、家电、汽车汽配、化工等制造行业的MOM与数字化工厂方案研发落地" [ref=e213]:
+                    - generic [ref=e214]:
+                      - generic [ref=e215]:
+                        - generic [ref=e216]: "#6"
+                        - generic [ref=e217]: 青岛
+                        - generic [ref=e218]: 匹配度 中
+                      - heading "青岛卡奥斯工业智能研究院有限公司" [level=4] [ref=e219]
+                      - paragraph [ref=e220]: 电子、家电、汽车汽配、化工等制造行业的MOM与数字化工厂方案研发落地
+                    - generic [ref=e221]: ›
+      - generic [ref=e222]:
+        - generic [ref=e223]:
+          - generic [ref=e224]:
+            - paragraph [ref=e225]: 高优线索
+            - generic [ref=e226]:
+              - heading "今日高优先级销售线索" [level=2] [ref=e227]
+              - paragraph [ref=e228]: 优先展示有时间、主体、地区和动作证据的高价值对象。
+          - generic [ref=e229]: 今天还没有同步到足够强的高优先级线索，等待自动化任务写入 latest.json。
+        - generic [ref=e230]:
+          - generic [ref=e231]:
+            - paragraph [ref=e232]: 明日动作
+            - generic [ref=e233]:
+              - heading "明日跟进清单" [level=2] [ref=e234]
+              - paragraph [ref=e235]: 把日报输出直接转成下一步动作，而不是停在摘要。
+          - generic [ref=e236]:
+            - generic [ref=e237]: 配置 GitHub 仓库 Secrets，把构建后的静态文件推送到服务器站点目录。
+            - generic [ref=e238]: 把域名子域名指向当前服务器，并配置 Nginx 和 HTTPS。
+            - generic [ref=e239]: 准备一个脚本，把 OpenClaw 日报结果转成 latest.json 覆盖当前示例数据。
+      - generic [ref=e240]:
+        - generic [ref=e241]:
+          - generic [ref=e242]:
+            - paragraph [ref=e243]: 潜在客户
+            - generic [ref=e244]:
+              - heading "潜在客户动态" [level=2] [ref=e245]
+              - paragraph [ref=e246]: 这部分允许保留更早期的信号，但会带上阶段、可信度和处理建议。
+          - generic [ref=e247]: 今日还没有同步到新的潜在客户动态。
+        - generic [ref=e248]:
+          - generic [ref=e249]:
+            - paragraph [ref=e250]: 重点企业
+            - generic [ref=e251]:
+              - heading "重点企业 / 竞对动作" [level=2] [ref=e252]
+              - paragraph [ref=e253]: 适合放山东重点厂商、集成商、客户案例和区域活跃度变化。
+          - generic [ref=e254]: 今日暂无新的重点企业或竞对动作。
+      - generic [ref=e255]:
+        - generic [ref=e256]:
+          - paragraph [ref=e257]: 覆盖缺口
+          - generic [ref=e258]:
+            - heading "今日未覆盖 / 证据不足" [level=2] [ref=e259]
+            - paragraph [ref=e260]: 把尚未核实完成的城市、主题和对象保留下来，方便第二天继续补查。
+        - generic [ref=e262]: 今日暂无额外的未覆盖或证据不足项。
+      - generic [ref=e263]:
+        - generic [ref=e264]:
+          - paragraph [ref=e265]: 客户名单
+          - generic [ref=e266]:
+            - heading "建议新增到潜在客户名单的对象" [level=2] [ref=e267]
+            - paragraph [ref=e268]: 把日报里值得反复跟踪的企业、园区、厂商沉淀成长期资产。
+        - generic [ref=e271]: 今日暂无建议新增对象，后续可以把 OpenClaw 产出的名单型结果写入 latest.json。
+  - alert [ref=e272]

@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
+import "./_components/i18n";
 import { CompetitorCompanyList } from "./_components/competitor-company-list";
 import { CompetitorMapPanel } from "./_components/competitor-map-panel";
+import { LanguageSwitcher } from "./_components/language-switcher";
+import { LocationWeatherClock } from "./_components/location-weather-clock";
 import { type ChinaAdminIndex, type CompetitorData } from "./_components/competitor-types";
 
 type RadarEntry = {
@@ -148,6 +152,7 @@ function MetricCard({
 }
 
 function EntryCard({ entry }: { entry: RadarEntry }) {
+  const { t } = useTranslation();
   const tags = [
     entry.location,
     entry.entity,
@@ -186,13 +191,13 @@ function EntryCard({ entry }: { entry: RadarEntry }) {
       <dl className="mt-5 grid gap-3 text-sm text-[var(--color-muted)] sm:grid-cols-2">
         {entry.source ? (
           <div>
-            <dt className="font-medium text-[var(--color-ink)]">来源</dt>
+            <dt className="font-medium text-[var(--color-ink)]">{t("entry.source")}</dt>
             <dd>{entry.source}</dd>
           </div>
         ) : null}
         {entry.publishedAt ? (
           <div>
-            <dt className="font-medium text-[var(--color-ink)]">发布时间</dt>
+            <dt className="font-medium text-[var(--color-ink)]">{t("entry.publishedAt")}</dt>
             <dd>{entry.publishedAt}</dd>
           </div>
         ) : null}
@@ -228,6 +233,7 @@ function EntryGrid({
 }
 
 export default function Home() {
+  const { t } = useTranslation();
   const [data, setData] = useState<RadarData>(fallbackData);
   const [competitorData, setCompetitorData] = useState<CompetitorData>(fallbackCompetitorData);
   const [adminIndex, setAdminIndex] = useState<ChinaAdminIndex>(fallbackAdminIndex);
@@ -281,24 +287,24 @@ export default function Home() {
   const heroMetrics = useMemo(
     () => [
       {
-        label: "高优线索",
+        label: t("metrics.highPriority"),
         value: String(data.highPriority.length),
-        detail: "今天值得立刻跟进的对象数。",
+        detail: t("metrics.highPriorityDetail"),
       },
       {
-        label: "潜在线索",
+        label: t("metrics.potentialLeads"),
         value: String(data.potentialLeads.length),
-        detail: "保留早期信号，便于持续跟进。",
+        detail: t("metrics.potentialLeadsDetail"),
       },
       {
-        label: "同行公司",
+        label: t("metrics.competitors"),
         value: String(competitorData.competitors.length),
-        detail: "只统计烟台与青岛范围内的同行样本。",
+        detail: t("metrics.competitorsDetail"),
       },
       {
-        label: "明日动作",
+        label: t("metrics.nextActions"),
         value: String(data.nextActions.length),
-        detail: "已转成下一步执行清单。",
+        detail: t("metrics.nextActionsDetail"),
       },
     ],
     [
@@ -306,6 +312,7 @@ export default function Home() {
       data.highPriority.length,
       data.nextActions.length,
       data.potentialLeads.length,
+      t,
     ]
   );
 
@@ -317,19 +324,24 @@ export default function Home() {
         <section className="overflow-hidden rounded-[2rem] border border-[var(--color-line)] bg-[linear-gradient(135deg,rgba(255,251,244,0.92),rgba(245,235,221,0.92))] p-6 shadow-[0_25px_70px_rgba(69,49,28,0.12)] sm:p-8 lg:p-10">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <LocationWeatherClock />
+                <LanguageSwitcher />
+              </div>
+
               <div className="inline-flex items-center gap-3 rounded-full border border-[var(--color-line)] bg-white/80 px-4 py-2 text-xs font-medium uppercase tracking-[0.3em] text-[var(--color-accent)]">
-                Yantai Manufacturing Signal Room
+                {t("chrome.badge")}
               </div>
 
               <div className="space-y-4">
                 <h1 className="max-w-4xl text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl lg:text-6xl">
-                  烟台优先的制造业销售雷达
+                  {t("chrome.heroTitle")}
                   <span className="mt-2 block text-[0.66em] font-medium text-[var(--color-muted)]">
-                    同时补一张“烟台 / 青岛同行地图”，让你知道谁在和你抢客户。
+                    {t("chrome.heroSubtitle")}
                   </span>
                 </h1>
                 <p className="max-w-3xl text-base leading-8 text-[var(--color-muted)] sm:text-lg">
-                  这页不是新闻堆叠，而是把销售线索、同行公司、跟进动作和证据缺口放进同一个面板，让你先判断再行动。
+                  {t("chrome.heroDescription")}
                 </p>
               </div>
 
@@ -347,15 +359,16 @@ export default function Home() {
 
             <div className="grid gap-4">
               <div className="rounded-[1.5rem] border border-[var(--color-line)] bg-white/80 p-5">
-                <p className="text-sm font-medium text-[var(--color-muted)]">当前焦点</p>
+                <p className="text-sm font-medium text-[var(--color-muted)]">{t("chrome.currentFocus")}</p>
                 <p className="mt-3 text-base leading-7 text-[var(--color-ink)]">{data.summary.focus}</p>
               </div>
               <div className="rounded-[1.5rem] border border-[var(--color-line)] bg-white/80 p-5">
-                <p className="text-sm font-medium text-[var(--color-muted)]">今日状态</p>
+                <p className="text-sm font-medium text-[var(--color-muted)]">{t("chrome.todayStatus")}</p>
                 <p className="mt-3 text-base leading-7 text-[var(--color-ink)]">{data.summary.status}</p>
               </div>
 
               <CompetitorMapPanel
+                baseline={competitorData.baseline}
                 adminIndex={adminIndex}
                 companies={competitorData.competitors}
                 status={competitorData.status}
@@ -370,9 +383,9 @@ export default function Home() {
 
         <section className="rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
           <SectionHeader
-            eyebrow="Competitor Deck"
-            title="烟台 / 青岛同行公司名片"
-            description="地图负责空间感，右侧名片负责细节。默认收起，点箭头或点地图点位再展开。"
+            eyebrow={t("deck.eyebrow")}
+            title={t("deck.title")}
+            description={t("deck.description")}
           />
 
           <div className="mt-6">
@@ -387,22 +400,22 @@ export default function Home() {
 
         <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-5 rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
-            <SectionHeader
-              eyebrow="Priority Leads"
-              title="今日高优先级销售线索"
-              description="优先展示有时间、主体、地区和动作证据的高价值对象。"
-            />
-            <EntryGrid
+          <SectionHeader
+            eyebrow={t("sections.priorityEyebrow")}
+            title={t("sections.priorityTitle")}
+            description={t("sections.priorityDescription")}
+          />
+          <EntryGrid
               entries={data.highPriority}
-              emptyLabel="今天还没有同步到足够强的高优先级线索，等待自动化任务写入 latest.json。"
+              emptyLabel={t("empty.priority")}
             />
           </div>
 
           <div className="space-y-6 rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
-            <SectionHeader
-              eyebrow="Pipeline"
-              title="明日跟进清单"
-              description="把日报输出直接转成下一步动作，而不是停在摘要。"
+          <SectionHeader
+              eyebrow={t("sections.pipelineEyebrow")}
+              title={t("sections.pipelineTitle")}
+              description={t("sections.pipelineDescription")}
             />
             <div className="grid gap-3">
               {data.nextActions.length ? (
@@ -415,7 +428,7 @@ export default function Home() {
                   </div>
                 ))
               ) : (
-                <EmptyState label="今日还没有写入下一步动作。" />
+                <EmptyState label={t("empty.pipeline")} />
               )}
             </div>
           </div>
@@ -424,34 +437,34 @@ export default function Home() {
         <section className="grid gap-8 xl:grid-cols-2">
           <div className="space-y-5 rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
             <SectionHeader
-              eyebrow="Potential Accounts"
-              title="潜在客户动态"
-              description="这部分允许保留更早期的信号，但会带上阶段、可信度和处理建议。"
+              eyebrow={t("sections.potentialEyebrow")}
+              title={t("sections.potentialTitle")}
+              description={t("sections.potentialDescription")}
             />
             <EntryGrid
               entries={data.potentialLeads}
-              emptyLabel="今日还没有同步到新的潜在客户动态。"
+              emptyLabel={t("empty.potential")}
             />
           </div>
 
           <div className="space-y-5 rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
             <SectionHeader
-              eyebrow="Watchlist"
-              title="重点企业 / 竞对动作"
-              description="适合放山东重点厂商、集成商、客户案例和区域活跃度变化。"
+              eyebrow={t("sections.watchlistEyebrow")}
+              title={t("sections.watchlistTitle")}
+              description={t("sections.watchlistDescription")}
             />
             <EntryGrid
               entries={data.watchItems}
-              emptyLabel="今日暂无新的重点企业或竞对动作。"
+              emptyLabel={t("empty.watchlist")}
             />
           </div>
         </section>
 
         <section className="rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
           <SectionHeader
-            eyebrow="Coverage Gaps"
-            title="今日未覆盖 / 证据不足"
-            description="把尚未核实完成的城市、主题和对象保留下来，方便第二天继续补查。"
+            eyebrow={t("sections.gapsEyebrow")}
+            title={t("sections.gapsTitle")}
+            description={t("sections.gapsDescription")}
           />
           <div className="mt-6 grid gap-3">
             {data.coverageGaps.length ? (
@@ -464,23 +477,23 @@ export default function Home() {
                 </div>
               ))
             ) : (
-              <EmptyState label="今日暂无额外的未覆盖或证据不足项。" />
+              <EmptyState label={t("empty.gaps")} />
             )}
           </div>
         </section>
 
         <section className="rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
           <SectionHeader
-            eyebrow="Account Deck"
-            title="建议新增到潜在客户名单的对象"
-            description="把日报里值得反复跟踪的企业、园区、厂商沉淀成长期资产。"
+            eyebrow={t("sections.accountsEyebrow")}
+            title={t("sections.accountsTitle")}
+            description={t("sections.accountsDescription")}
           />
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             {data.accounts.length ? (
               data.accounts.map((account) => <EntryCard key={account.title} entry={account} />)
             ) : (
               <div className="lg:col-span-3">
-                <EmptyState label="今日暂无建议新增对象，后续可以把 OpenClaw 产出的名单型结果写入 latest.json。" />
+                <EmptyState label={t("empty.accounts")} />
               </div>
             )}
           </div>

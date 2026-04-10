@@ -8,6 +8,23 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+If you also want local `/api/*` requests to resolve against the Node backend, start the API in a second terminal:
+
+```bash
+pnpm api:start
+pnpm dev
+```
+
+In development, `next.config.ts` rewrites `/api/:path*` to `http://127.0.0.1:3180/api/:path*` by default.
+You can override that target with:
+
+```bash
+RADAR_API_PROXY_URL=http://127.0.0.1:3180
+```
+
+Use `http://localhost:3000` in the browser for local development.
+On this machine, `http://127.0.0.1:3000` may be affected by the system proxy and break Next HMR / client data loading.
+
 ## Build
 
 ```bash

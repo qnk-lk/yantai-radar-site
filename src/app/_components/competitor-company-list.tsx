@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
+
 import {
   DISTANCE_LABELS,
   DISTANCE_ORDER,
@@ -44,6 +46,7 @@ export function CompetitorCompanyList({
   selectedKey: string | null;
   onSelect: (key: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const grouped = DISTANCE_ORDER.map((tier) => ({
     tier,
     items: companies
@@ -56,7 +59,7 @@ export function CompetitorCompanyList({
       <div className="space-y-5">
         <div className="rounded-[1.75rem] border border-[var(--color-line)] bg-[var(--color-card-soft)] p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-accent)]">
-            对标基准
+            {t("deck.baseline")}
           </p>
           <h3 className="mt-3 text-2xl font-semibold text-[var(--color-ink)]">
             {baseline.companyName}
@@ -97,7 +100,7 @@ export function CompetitorCompanyList({
                 {DISTANCE_LABELS[group.tier]}
               </h3>
               <span className="rounded-full border border-[var(--color-line)] px-3 py-1 text-xs text-[var(--color-muted)]">
-                {group.items.length} 家
+                {group.items.length}
               </span>
             </div>
 
@@ -125,7 +128,7 @@ export function CompetitorCompanyList({
                             {company.city}
                           </span>
                           <span className="rounded-full border border-[var(--color-line)] px-3 py-1 text-xs text-[var(--color-muted)]">
-                            匹配度 {company.serviceFit}
+                            {t("deck.serviceFit", { fit: company.serviceFit })}
                           </span>
                         </div>
                         <h4 className="text-lg font-semibold leading-7 text-[var(--color-ink)]">
@@ -165,11 +168,11 @@ export function CompetitorCompanyList({
 
                         <div className="grid gap-3 text-sm leading-7 text-[var(--color-muted)] sm:grid-cols-2">
                           <div className="rounded-[1rem] border border-[var(--color-line)] bg-white/70 px-4 py-3">
-                            <p className="font-medium text-[var(--color-ink)]">制造业聚焦</p>
+                            <p className="font-medium text-[var(--color-ink)]">{t("deck.manufacturingFocus")}</p>
                             <p className="mt-1">{company.manufacturingFocus}</p>
                           </div>
                           <div className="rounded-[1rem] border border-[var(--color-line)] bg-white/70 px-4 py-3">
-                            <p className="font-medium text-[var(--color-ink)]">证据强度</p>
+                            <p className="font-medium text-[var(--color-ink)]">{t("deck.evidenceStrength")}</p>
                             <p className="mt-1">{company.evidenceStrength}</p>
                           </div>
                         </div>

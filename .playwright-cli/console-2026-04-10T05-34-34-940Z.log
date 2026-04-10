@@ -1,0 +1,76 @@
+[     208ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/02_9_next_dist_0hfteu1._.js:2431
+[     289ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/02_9_next_dist_0hfteu1._.js:2431
+[     389ms] Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <SegmentViewNode type="page" pagePath="page.tsx">
+      <SegmentTrieNode>
+      <ClientPageRoot Component={function Home} serverProvidedParams={{...}}>
+        <Home params={Promise} searchParams={Promise}>
+          <main className="min-h-scre...">
+            <div>
+            <div className="mx-auto fl...">
+              <section className="overflow-h...">
+                <div className="grid gap-8...">
+                  <div className="space-y-6">
+                    <div className="flex flex-...">
+                      <LocationWeatherClock>
+                        <div className="min-w-[16r...">
+                          <div className="flex items...">
+                            <div className="space-y-1">
+                              <p>
+                              <p className="text-lg font-semibold text-[var(--color-ink)]">
++                               4月10日周五 13:34:35
+-                               4月10日周五 13:34:34
+                            ...
+                      ...
+                    ...
+                  ...
+              ...
+    ...
+
+    at throwOnHydrationMismatch (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:3318:56)
+    at prepareToHydrateHostInstance (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:3372:23)
+    at completeWork (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:6922:60)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:965:74)
+    at completeUnitOfWork (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:9622:23)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:9557:28)
+    at workLoopConcurrentByScheduler (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:9551:58)
+    at renderRootConcurrent (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:9534:71)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_react-dom_0k.cbnm._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3000/_next/static/chunks/02_9_next_dist_compiled_0vnie9~._.js:2647:64)
+[     407ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/radar/latest?t=1775799275329:0
+[     422ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/competitors?t=1775799275330:0
+[     424ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/admin/divisions?t=1775799275331:0
+[     433ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/radar/latest?t=1775799275334:0
+[     438ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/competitors?t=1775799275334:0
+[     455ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/admin/divisions?t=1775799275335:0
+[   52513ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/02_9_next_dist_0hfteu1._.js:2431
+[   52658ms] [LOG] [Fast Refresh] done in 57ms @ http://localhost:3000/_next/static/chunks/02_9_next_dist_0hfteu1._.js:2431
+[   83908ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/02_9_next_dist_0hfteu1._.js:2431
+[   84053ms] [LOG] [Fast Refresh] done in 63ms @ http://localhost:3000/_next/static/chunks/02_9_next_dist_0hfteu1._.js:2431
+[  126948ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/02_9_next_dist_0hfteu1._.js:2431
+[  127030ms] [LOG] [Fast Refresh] done in 186ms @ http://localhost:3000/_next/static/chunks/02_9_next_dist_0hfteu1._.js:2431
+[  179928ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  183265ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  186616ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  189982ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  193355ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  200699ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  208064ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  215413ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  222758ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  230102ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  237446ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
+[  244803ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=M58i4lrudgw-sYODHJe8q' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/02_9_next_dist_client_0n9mnch._.js:13299
