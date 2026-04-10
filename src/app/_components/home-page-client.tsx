@@ -42,7 +42,7 @@ type RadarData = {
 const fallbackData: RadarData = {
   updatedAt: "等待首次自动同步",
   summary: {
-    focus: "烟台优先，向青岛、威海、潍坊扩展，再补山东重点制造城市。",
+    focus: "烟台优先，只看烟台和青岛，优先跟进制造业相关的 MES / WMS / QMS 信号。",
     status: "当前站点已就绪，等待 OpenClaw 每日任务产出。",
     note: "建议先把这页作为对外展示层，日报和潜在客户名单后续再自动落盘到 latest.json。",
   },
@@ -76,6 +76,44 @@ const publicApiBaseUrl = process.env.NEXT_PUBLIC_RADAR_API_BASE_URL?.replace(/\/
 
 function withApiBase(path: string) {
   return publicApiBaseUrl ? `${publicApiBaseUrl}${path}` : path;
+}
+
+function parseUpdatedAt(value: string): number | null {
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?/
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day, hour, minute, second = "00"] = match;
+
+  return Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second)
+  );
+}
+
+function pickLatestUpdatedAt(...values: string[]) {
+  const fallback = values.find((value) => value.trim().length) ?? "等待首次自动同步";
+  let latestValue = fallback;
+  let latestTimestamp = -1;
+
+  for (const value of values) {
+    const timestamp = parseUpdatedAt(value);
+
+    if (timestamp !== null && timestamp > latestTimestamp) {
+      latestTimestamp = timestamp;
+      latestValue = value;
+    }
+  }
+
+  return latestValue;
 }
 
 async function loadJson<T>(url: string): Promise<T> {
@@ -319,6 +357,11 @@ export default function Home() {
     ]
   );
 
+  const latestDisplayUpdatedAt = useMemo(
+    () => pickLatestUpdatedAt(data.updatedAt, competitorData.updatedAt),
+    [competitorData.updatedAt, data.updatedAt]
+  );
+
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-ink)]">
       <div className="absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,_rgba(182,107,58,0.24),_transparent_48%),radial-gradient(circle_at_75%_18%,_rgba(53,97,108,0.18),_transparent_42%)]" />
@@ -392,7 +435,7 @@ export default function Home() {
                 companies={competitorData.competitors}
                 status={competitorData.status}
                 note={competitorData.note}
-                updatedAt={competitorData.updatedAt}
+                updatedAt={latestDisplayUpdatedAt}
                 selectedKey={selectedMapCompetitorKey}
                 onSelect={(key) => {
                   setSelectedMapCompetitorKey(key);

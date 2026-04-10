@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
-FOCUS_TEXT = "烟台优先，向青岛、威海、潍坊扩展，再补山东重点制造城市。"
+FOCUS_TEXT = "烟台优先，只看烟台和青岛，优先跟进制造业相关的 MES / WMS / QMS 信号。"
 SECTION_TITLES = {
     "今日高优先级销售线索": "high_priority",
     "潜在客户动态": "potential_leads",
