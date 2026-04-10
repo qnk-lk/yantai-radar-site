@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   WiCloud,
@@ -72,20 +72,11 @@ function WeatherStatusIcon({ code }: { code: number | null }) {
 }
 
 export function LocationWeatherClock() {
-  const { t, i18n } = useTranslation();
-  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const { t } = useTranslation();
   const [status, setStatus] = useState<"locating" | "ready" | "denied" | "weather-error">(
     "locating"
   );
   const [weather, setWeather] = useState<WeatherState>(defaultWeather);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -180,52 +171,32 @@ export function LocationWeatherClock() {
     };
   }, [t]);
 
-  const timeText = useMemo(() => {
-    if (!currentTime) {
-      return "--:--:--";
-    }
-
-    const language = i18n.resolvedLanguage || "zh-CN";
-
-    return new Intl.DateTimeFormat(language, {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      month: "short",
-      day: "numeric",
-      weekday: "short",
-      timeZone: weather.timezone,
-    }).format(currentTime);
-  }, [currentTime, i18n.resolvedLanguage, weather.timezone]);
-
   let statusText = t("topbar.locating");
 
   if (status === "denied") {
-    statusText = t("topbar.locationDenied");
+    statusText = '';
   } else if (status === "weather-error") {
     statusText = t("topbar.weatherUnavailable");
   } else if (status === "ready") {
     statusText =
-      weather.temperature === null ? t("topbar.weatherLoading") : `${Math.round(weather.temperature)}°C`;
+      weather.temperature === null
+        ? t("topbar.weatherLoading")
+        : `${Math.round(weather.temperature)}°C`;
   }
 
   return (
-    <div className="min-w-[16rem] rounded-[1.25rem] border border-[var(--color-line)] bg-white/88 p-3 shadow-[0_14px_36px_rgba(69,49,28,0.08)]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="space-y-1">
+    <div className="w-full flex items-center max-w-[24rem] rounded-[1.25rem]   ">
+        <div className="min-w-0 space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--color-muted)]">
             {weather.city}
           </p>
-          <p className="text-lg font-semibold text-[var(--color-ink)]" suppressHydrationWarning>
-            {timeText}
-          </p>
+         
         </div>
 
-        <div className="flex items-center gap-2 rounded-full bg-[var(--color-card-soft)] px-3 py-2 text-[var(--color-ink)]">
+        <div className="shrink-0 flex items-center gap-2 rounded-full  px-3 py-2 text-[var(--color-ink)]">
           <WeatherStatusIcon code={weather.weatherCode} />
           <span className="text-sm font-medium">{statusText}</span>
         </div>
-      </div>
     </div>
   );
 }

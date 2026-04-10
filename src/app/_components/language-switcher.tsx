@@ -2,7 +2,6 @@
 
 import Select, { components, type SingleValueProps } from "react-select";
 import ReactCountryFlag from "react-country-flag";
-import { useTranslation } from "react-i18next";
 
 import i18n, { languageOptions } from "./i18n";
 
@@ -24,15 +23,11 @@ function SingleValue(props: SingleValueProps<LanguageOption, false>) {
 }
 
 export function LanguageSwitcher() {
-  const { t } = useTranslation();
   const currentLanguage =
     languageOptions.find((item) => item.value === i18n.resolvedLanguage) ?? languageOptions[0];
 
   return (
-    <div className="min-w-[13rem] rounded-[1.25rem] border border-[var(--color-line)] bg-white/88 p-3 shadow-[0_14px_36px_rgba(69,49,28,0.08)]">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--color-muted)]">
-        {t("topbar.language")}
-      </p>
+    <div className="w-full md:w-[8rem] md:justify-self-end">
       <Select<LanguageOption, false>
         instanceId="language-switcher"
         classNamePrefix="radar-select"

@@ -12,4 +12,4 @@ if (-not $addresses) {
 }
 
 Write-Host "Starting Next dev server on $addresses:3000"
-pnpm exec next dev --hostname $addresses --webpack
+pnpm exec next dev --hostname $addresses

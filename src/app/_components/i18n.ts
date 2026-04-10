@@ -4,6 +4,9 @@ import i18n from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";
 
+import zh from "@/locales/radar/zh.json";
+import zhCN from "@/locales/radar/zh-CN.json";
+
 export const languageOptions = [
   { value: "zh-CN", label: "中文", flag: "CN" },
   { value: "ko", label: "한국어", flag: "KR" },
@@ -14,90 +17,6 @@ export const languageOptions = [
   { value: "en-GB", label: "English (UK)", flag: "GB" },
   { value: "fr", label: "Français", flag: "FR" },
 ] as const;
-
-const zhCN = {
-  chrome: {
-    title: "烟台优先销售线索雷达",
-    badge: "烟台制造信号室",
-    heroTitle: "烟台优先的制造业销售雷达",
-    heroSubtitle: "同时补一张“烟台 / 青岛同行地图”，让你知道谁在和你抢客户。",
-    heroDescription:
-      "这页不是新闻堆叠，而是把销售线索、同行公司、跟进动作和证据缺口放进同一个面板，让你先判断再行动。",
-    currentFocus: "当前焦点",
-    todayStatus: "今日状态",
-  },
-  topbar: {
-    locating: "正在获取位置...",
-    weatherLoading: "正在获取天气...",
-    locationDenied: "位置权限未开启",
-    weatherUnavailable: "天气暂不可用",
-    language: "语言",
-    defaultLocation: "烟台开发区",
-  },
-  metrics: {
-    highPriority: "高优线索",
-    highPriorityDetail: "今天值得立刻跟进的对象数。",
-    potentialLeads: "潜在线索",
-    potentialLeadsDetail: "保留早期信号，便于持续跟进。",
-    competitors: "同行公司",
-    competitorsDetail: "只统计烟台与青岛范围内的同行样本。",
-    nextActions: "明日动作",
-    nextActionsDetail: "已转成下一步执行清单。",
-  },
-  map: {
-    title: "烟台 / 青岛同行分布",
-    competitorMap: "同行地图",
-    noCoordinates: "暂无同行坐标，先展示地图底图",
-    yantaiCount: "烟台 {{count}} 家",
-    qingdaoCount: "青岛 {{count}} 家",
-    linkedTo: "已联动到 {{name}}，下方名片已展开；当前路径为 {{path}}。",
-    noData: "当前还没有可落点的同行数据，地图底图仍可正常浏览。",
-    baselineMarker: "对标基准",
-    competitorTooltip: "{{name}} · {{city}} · {{fit}}",
-  },
-  deck: {
-    eyebrow: "同行名片",
-    title: "烟台 / 青岛同行公司名片",
-    description: "地图负责空间感，右侧名片负责细节。默认收起，点箭头或点地图点位再展开。",
-    baseline: "对标基准",
-    serviceFit: "匹配度 {{fit}}",
-    manufacturingFocus: "制造业聚焦",
-    evidenceStrength: "证据强度",
-    evidence: "证据",
-  },
-  sections: {
-    priorityEyebrow: "高优线索",
-    priorityTitle: "今日高优先级销售线索",
-    priorityDescription: "优先展示有时间、主体、地区和动作证据的高价值对象。",
-    pipelineEyebrow: "明日动作",
-    pipelineTitle: "明日跟进清单",
-    pipelineDescription: "把日报输出直接转成下一步动作，而不是停在摘要。",
-    potentialEyebrow: "潜在客户",
-    potentialTitle: "潜在客户动态",
-    potentialDescription: "这部分允许保留更早期的信号，但会带上阶段、可信度和处理建议。",
-    watchlistEyebrow: "重点企业",
-    watchlistTitle: "重点企业 / 竞对动作",
-    watchlistDescription: "适合放山东重点厂商、集成商、客户案例和区域活跃度变化。",
-    gapsEyebrow: "覆盖缺口",
-    gapsTitle: "今日未覆盖 / 证据不足",
-    gapsDescription: "把尚未核实完成的城市、主题和对象保留下来，方便第二天继续补查。",
-    accountsEyebrow: "客户名单",
-    accountsTitle: "建议新增到潜在客户名单的对象",
-    accountsDescription: "把日报里值得反复跟踪的企业、园区、厂商沉淀成长期资产。",
-  },
-  entry: {
-    source: "来源",
-    publishedAt: "发布时间",
-  },
-  empty: {
-    priority: "今天还没有同步到足够强的高优先级线索，等待自动化任务写入 latest.json。",
-    pipeline: "今日还没有写入下一步动作。",
-    potential: "今日还没有同步到新的潜在客户动态。",
-    watchlist: "今日暂无新的重点企业或竞对动作。",
-    gaps: "今日暂无额外的未覆盖或证据不足项。",
-    accounts: "今日暂无建议新增对象，后续可以把 OpenClaw 产出的名单型结果写入 latest.json。",
-  },
-};
 
 const enUS = {
   chrome: {
@@ -444,15 +363,24 @@ const fr = {
 };
 
 const resources = {
-  "zh-CN": { translation: zhCN },
-  ko: { translation: ko },
-  "ko-KP": { translation: ko },
-  ja: { translation: ja },
-  th: { translation: th },
-  "en-US": { translation: enUS },
-  "en-GB": { translation: enUS },
-  fr: { translation: fr },
+  zh: { radar: zh },
+  "zh-CN": { radar: zhCN },
+  ko: { radar: ko },
+  "ko-KP": { radar: ko },
+  ja: { radar: ja },
+  th: { radar: th },
+  "en-US": { radar: enUS },
+  "en-GB": { radar: enUS },
+  fr: { radar: fr },
 } as const;
+
+function normalizeDocumentLanguage(lng: string | undefined) {
+  if (!lng || lng === "zh") {
+    return "zh-CN";
+  }
+
+  return lng;
+}
 
 if (!i18n.isInitialized) {
   i18n
@@ -462,7 +390,9 @@ if (!i18n.isInitialized) {
       resources,
       lng: "zh-CN",
       fallbackLng: "zh-CN",
-      supportedLngs: languageOptions.map((item) => item.value),
+      defaultNS: "radar",
+      ns: ["radar"],
+      supportedLngs: ["zh", ...languageOptions.map((item) => item.value)],
       interpolation: {
         escapeValue: false,
       },
@@ -474,9 +404,9 @@ if (!i18n.isInitialized) {
 }
 
 if (typeof window !== "undefined") {
-  document.documentElement.lang = i18n.resolvedLanguage || "zh-CN";
+  document.documentElement.lang = normalizeDocumentLanguage(i18n.resolvedLanguage);
   i18n.on("languageChanged", (lng) => {
-    document.documentElement.lang = lng;
+    document.documentElement.lang = normalizeDocumentLanguage(lng);
   });
 }
 

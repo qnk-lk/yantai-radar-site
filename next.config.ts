@@ -7,7 +7,7 @@ const currentDir = path.dirname(currentFilePath);
 const localApiProxyUrl = process.env.RADAR_API_PROXY_URL || "http://127.0.0.1:3180";
 
 const nextConfig: NextConfig = {
-  output: "export",
+  ...(process.env.NODE_ENV === "production" ? { output: "export" } : {}),
   transpilePackages: ["echarts", "zrender"],
   turbopack: {
     root: currentDir,

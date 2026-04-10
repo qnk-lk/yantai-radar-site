@@ -219,7 +219,7 @@ export function CompetitorMapView({
             direction="top"
             offset={[0, -10]}
             opacity={1}
-            className="competitor-map-tooltip"
+          className="competitor-map-tooltip"
           >
             <span>
               {t("map.competitorTooltip", {
