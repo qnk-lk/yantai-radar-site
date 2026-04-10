@@ -1,0 +1,12 @@
+.next
+.playwright-cli
+out
+output
+node_modules
+server/data
+pnpm-lock.yaml
+openclaw-config
+public/china-admin-divisions.json
+public/competitors.json
+pnpm-workspace.yaml
+AGENTS.md

@@ -4,14 +4,7 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import L, { type DivIcon } from "leaflet";
-import {
-  MapContainer,
-  Marker,
-  TileLayer,
-  Tooltip,
-  useMap,
-  useMapEvents,
-} from "react-leaflet";
+import { MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 
 import {
   type CompetitorBaseline,
@@ -116,11 +109,7 @@ function buildBaselineMarker(baseline: CompetitorBaseline): BaselineMarker {
   };
 }
 
-function SelectedMarkerFollower({
-  marker,
-}: {
-  marker: CompanyMarker | null;
-}) {
+function SelectedMarkerFollower({ marker }: { marker: CompanyMarker | null }) {
   const map = useMap();
 
   useEffect(() => {
@@ -190,10 +179,7 @@ export function CompetitorMapView({
       <MapInteractionTracker />
       <SelectedMarkerFollower marker={selectedMarker} />
 
-      <Marker
-        position={[baselineMarker.lat, baselineMarker.lon]}
-        icon={createBaselineIcon()}
-      >
+      <Marker position={[baselineMarker.lat, baselineMarker.lon]} icon={createBaselineIcon()}>
         <Tooltip
           direction="top"
           offset={[0, -10]}
@@ -215,12 +201,7 @@ export function CompetitorMapView({
             click: () => onSelect(marker.key),
           }}
         >
-          <Tooltip
-            direction="top"
-            offset={[0, -10]}
-            opacity={1}
-          className="competitor-map-tooltip"
-          >
+          <Tooltip direction="top" offset={[0, -10]} opacity={1} className="competitor-map-tooltip">
             <span>
               {t("map.competitorTooltip", {
                 name: marker.company.companyName,

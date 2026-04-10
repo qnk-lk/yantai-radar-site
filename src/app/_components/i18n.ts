@@ -73,16 +73,19 @@ const enUS = {
   sections: {
     priorityEyebrow: "Priority Leads",
     priorityTitle: "High-Priority Leads Today",
-    priorityDescription: "Show the highest-value targets with timing, entity, region, and action evidence.",
+    priorityDescription:
+      "Show the highest-value targets with timing, entity, region, and action evidence.",
     pipelineEyebrow: "Pipeline",
     pipelineTitle: "Next Follow-Up Actions",
     pipelineDescription: "Turn the daily report into actions instead of stopping at a summary.",
     potentialEyebrow: "Potential Accounts",
     potentialTitle: "Potential Account Signals",
-    potentialDescription: "This area keeps earlier signals with stage, confidence, and handling advice.",
+    potentialDescription:
+      "This area keeps earlier signals with stage, confidence, and handling advice.",
     watchlistEyebrow: "Watchlist",
     watchlistTitle: "Key Accounts / Competitor Moves",
-    watchlistDescription: "Suitable for major Shandong manufacturers, integrators, customer cases, and activity changes.",
+    watchlistDescription:
+      "Suitable for major Shandong manufacturers, integrators, customer cases, and activity changes.",
     gapsEyebrow: "Coverage Gaps",
     gapsTitle: "Not Covered / Insufficient Evidence Today",
     gapsDescription: "Keep unfinished cities, themes, and entities visible for the next round.",
@@ -109,8 +112,10 @@ const ko = {
     title: "옌타이 제조 영업 레이더",
     badge: "옌타이 시그널 룸",
     heroTitle: "옌타이 우선 제조 영업 레이더",
-    heroSubtitle: "옌타이 / 칭다오 경쟁사 지도를 함께 보여 주어 같은 고객을 노리는 회사를 확인할 수 있습니다.",
-    heroDescription: "이 페이지는 뉴스 모음이 아니라 리드, 경쟁사, 후속 조치, 증거 공백을 한 화면에 모아 먼저 판단하고 나중에 행동하게 합니다.",
+    heroSubtitle:
+      "옌타이 / 칭다오 경쟁사 지도를 함께 보여 주어 같은 고객을 노리는 회사를 확인할 수 있습니다.",
+    heroDescription:
+      "이 페이지는 뉴스 모음이 아니라 리드, 경쟁사, 후속 조치, 증거 공백을 한 화면에 모아 먼저 판단하고 나중에 행동하게 합니다.",
     currentFocus: "현재 초점",
     todayStatus: "오늘 상태",
   },
@@ -174,7 +179,8 @@ const ja = {
     badge: "煙台シグナルルーム",
     heroTitle: "煙台優先の製造業営業レーダー",
     heroSubtitle: "煙台 / 青島の競合マップも合わせて表示し、同じ顧客を狙う会社を確認できます。",
-    heroDescription: "このページはニュースの寄せ集めではなく、リード、競合、次の行動、証拠不足を一つの画面にまとめています。",
+    heroDescription:
+      "このページはニュースの寄せ集めではなく、リード、競合、次の行動、証拠不足を一つの画面にまとめています。",
     currentFocus: "現在の焦点",
     todayStatus: "本日の状態",
   },
@@ -238,7 +244,8 @@ const th = {
     badge: "ห้องสัญญาณเยียนไถ",
     heroTitle: "เรดาร์การขายอุตสาหกรรมการผลิต เน้นเยียนไถ",
     heroSubtitle: "พร้อมแผนที่คู่แข่งเยียนไถ / ชิงเต่า เพื่อดูว่าใครกำลังแย่งลูกค้าเดียวกัน",
-    heroDescription: "หน้านี้ไม่ใช่กองข่าว แต่รวมลีด คู่แข่ง งานติดตาม และช่องว่างของหลักฐานไว้ในแผงเดียว",
+    heroDescription:
+      "หน้านี้ไม่ใช่กองข่าว แต่รวมลีด คู่แข่ง งานติดตาม และช่องว่างของหลักฐานไว้ในแผงเดียว",
     currentFocus: "โฟกัสปัจจุบัน",
     todayStatus: "สถานะวันนี้",
   },
@@ -332,7 +339,8 @@ const fr = {
     noCoordinates: "Pas encore de coordonnées concurrentes. La carte de base reste visible.",
     yantaiCount: "Yantai {{count}}",
     qingdaoCount: "Qingdao {{count}}",
-    linkedTo: "Lié à {{name}}. La carte détaillée ci-dessous est ouverte. Chemin actuel : {{path}}.",
+    linkedTo:
+      "Lié à {{name}}. La carte détaillée ci-dessous est ouverte. Chemin actuel : {{path}}.",
     noData: "Aucune donnée concurrentielle cartographiable pour le moment.",
     baselineMarker: "Référence",
     competitorTooltip: "{{name}} · {{city}} · {{fit}}",

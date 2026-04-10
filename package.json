@@ -8,6 +8,8 @@
     "start": "pnpm dlx serve out -l 4173",
     "preview": "pnpm dlx serve out -l 4173",
     "lint": "eslint",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
     "api:start": "node server/index.mjs --host 0.0.0.0",
     "api:dev": "node --watch server/index.mjs --host 0.0.0.0"
   },
@@ -38,6 +40,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "prettier": "^3.8.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

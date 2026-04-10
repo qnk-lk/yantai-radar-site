@@ -136,15 +136,7 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
+function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="rounded-[1.5rem] border border-[var(--color-line)] bg-white/80 p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--color-muted)]">
@@ -217,13 +209,7 @@ function EntryCard({ entry }: { entry: RadarEntry }) {
   );
 }
 
-function EntryGrid({
-  entries,
-  emptyLabel,
-}: {
-  entries: RadarEntry[];
-  emptyLabel: string;
-}) {
+function EntryGrid({ entries, emptyLabel }: { entries: RadarEntry[]; emptyLabel: string }) {
   if (!entries.length) {
     return <EmptyState label={emptyLabel} />;
   }
@@ -242,7 +228,10 @@ export default function Home() {
   const [data, setData] = useState<RadarData>(fallbackData);
   const [competitorData, setCompetitorData] = useState<CompetitorData>(fallbackCompetitorData);
   const [adminIndex, setAdminIndex] = useState<ChinaAdminIndex>(fallbackAdminIndex);
-  const [selectedCompetitorKey, setSelectedCompetitorKey] = useState<string | null>(null);
+  const [selectedMapCompetitorKey, setSelectedMapCompetitorKey] = useState<string | null>(null);
+  const [expandedCompetitorKey, setExpandedCompetitorKey] = useState<string | null>(null);
+  const [priorityCompetitorKey, setPriorityCompetitorKey] = useState<string | null>(null);
+  const [priorityCompetitorSignal, setPriorityCompetitorSignal] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -250,7 +239,10 @@ export default function Home() {
     async function loadData() {
       const [radarResult, competitorResult, adminIndexResult] = await Promise.allSettled([
         loadJsonWithFallback<RadarData>([withApiBase("/api/radar/latest"), "/latest.json"]),
-        loadJsonWithFallback<CompetitorData>([withApiBase("/api/competitors"), "/competitors.json"]),
+        loadJsonWithFallback<CompetitorData>([
+          withApiBase("/api/competitors"),
+          "/competitors.json",
+        ]),
         loadJsonWithFallback<ChinaAdminIndex>([
           withApiBase("/api/admin/divisions"),
           "/china-admin-divisions.json",
@@ -270,7 +262,10 @@ export default function Home() {
       setData(nextRadar);
       setCompetitorData(nextCompetitors);
       setAdminIndex(nextAdminIndex);
-      setSelectedCompetitorKey(null);
+      setSelectedMapCompetitorKey(null);
+      setExpandedCompetitorKey(null);
+      setPriorityCompetitorKey(null);
+      setPriorityCompetitorSignal(0);
     }
 
     loadData().catch(() => {
@@ -281,7 +276,10 @@ export default function Home() {
       setData(fallbackData);
       setCompetitorData(fallbackCompetitorData);
       setAdminIndex(fallbackAdminIndex);
-      setSelectedCompetitorKey(null);
+      setSelectedMapCompetitorKey(null);
+      setExpandedCompetitorKey(null);
+      setPriorityCompetitorKey(null);
+      setPriorityCompetitorSignal(0);
     });
 
     return () => {
@@ -337,19 +335,14 @@ export default function Home() {
               <div className="inline-flex items-center gap-3 rounded-full border border-[var(--color-line)] bg-white/80 px-4 py-2 text-xs font-medium uppercase tracking-[0.3em] text-[var(--color-accent)]">
                 {t("chrome.badge")}
               </div>
-
               <div className="space-y-4">
                 <h1 className="max-w-4xl text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl lg:text-6xl">
                   {t("chrome.heroTitle")}
-                  <span className="mt-2 block text-[0.66em] font-medium text-[var(--color-muted)]">
-                    {t("chrome.heroSubtitle")}
-                  </span>
                 </h1>
                 <p className="max-w-3xl text-base leading-8 text-[var(--color-muted)] sm:text-lg">
                   {t("chrome.heroDescription")}
                 </p>
               </div>
-
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {heroMetrics.map((item) => (
                   <MetricCard
@@ -360,16 +353,37 @@ export default function Home() {
                   />
                 ))}
               </div>
+              <div>
+                <CompetitorCompanyList
+                  companies={competitorData.competitors}
+                  priorityKey={priorityCompetitorKey}
+                  prioritySignal={priorityCompetitorSignal}
+                  selectedKey={expandedCompetitorKey}
+                  onSelect={(key) => {
+                    setExpandedCompetitorKey(key);
+                    setPriorityCompetitorKey(null);
+                    setPriorityCompetitorSignal(0);
+                  }}
+                />
+              </div>
             </div>
 
             <div className="grid gap-4">
               <div className="rounded-[1.5rem] border border-[var(--color-line)] bg-white/80 p-5">
-                <p className="text-sm font-medium text-[var(--color-muted)]">{t("chrome.currentFocus")}</p>
-                <p className="mt-3 text-base leading-7 text-[var(--color-ink)]">{data.summary.focus}</p>
+                <p className="text-sm font-medium text-[var(--color-muted)]">
+                  {t("chrome.currentFocus")}
+                </p>
+                <p className="mt-3 text-base leading-7 text-[var(--color-ink)]">
+                  {data.summary.focus}
+                </p>
               </div>
               <div className="rounded-[1.5rem] border border-[var(--color-line)] bg-white/80 p-5">
-                <p className="text-sm font-medium text-[var(--color-muted)]">{t("chrome.todayStatus")}</p>
-                <p className="mt-3 text-base leading-7 text-[var(--color-ink)]">{data.summary.status}</p>
+                <p className="text-sm font-medium text-[var(--color-muted)]">
+                  {t("chrome.todayStatus")}
+                </p>
+                <p className="mt-3 text-base leading-7 text-[var(--color-ink)]">
+                  {data.summary.status}
+                </p>
               </div>
 
               <CompetitorMapPanel
@@ -379,45 +393,30 @@ export default function Home() {
                 status={competitorData.status}
                 note={competitorData.note}
                 updatedAt={competitorData.updatedAt}
-                selectedKey={selectedCompetitorKey}
-                onSelect={setSelectedCompetitorKey}
+                selectedKey={selectedMapCompetitorKey}
+                onSelect={(key) => {
+                  setSelectedMapCompetitorKey(key);
+                  setExpandedCompetitorKey(key);
+                  setPriorityCompetitorKey(key);
+                  setPriorityCompetitorSignal((value) => value + 1);
+                }}
               />
             </div>
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
-          <SectionHeader
-            eyebrow={t("deck.eyebrow")}
-            title={t("deck.title")}
-            description={t("deck.description")}
-          />
-
-          <div className="mt-6">
-            <CompetitorCompanyList
-              baseline={competitorData.baseline}
-              companies={competitorData.competitors}
-              selectedKey={selectedCompetitorKey}
-              onSelect={setSelectedCompetitorKey}
-            />
-          </div>
-        </section>
-
         <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-5 rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
-          <SectionHeader
-            eyebrow={t("sections.priorityEyebrow")}
-            title={t("sections.priorityTitle")}
-            description={t("sections.priorityDescription")}
-          />
-          <EntryGrid
-              entries={data.highPriority}
-              emptyLabel={t("empty.priority")}
+            <SectionHeader
+              eyebrow={t("sections.priorityEyebrow")}
+              title={t("sections.priorityTitle")}
+              description={t("sections.priorityDescription")}
             />
+            <EntryGrid entries={data.highPriority} emptyLabel={t("empty.priority")} />
           </div>
 
           <div className="space-y-6 rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
-          <SectionHeader
+            <SectionHeader
               eyebrow={t("sections.pipelineEyebrow")}
               title={t("sections.pipelineTitle")}
               description={t("sections.pipelineDescription")}
@@ -446,10 +445,7 @@ export default function Home() {
               title={t("sections.potentialTitle")}
               description={t("sections.potentialDescription")}
             />
-            <EntryGrid
-              entries={data.potentialLeads}
-              emptyLabel={t("empty.potential")}
-            />
+            <EntryGrid entries={data.potentialLeads} emptyLabel={t("empty.potential")} />
           </div>
 
           <div className="space-y-5 rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-card)] p-6 shadow-[0_20px_60px_rgba(69,49,28,0.08)] sm:p-8">
@@ -458,10 +454,7 @@ export default function Home() {
               title={t("sections.watchlistTitle")}
               description={t("sections.watchlistDescription")}
             />
-            <EntryGrid
-              entries={data.watchItems}
-              emptyLabel={t("empty.watchlist")}
-            />
+            <EntryGrid entries={data.watchItems} emptyLabel={t("empty.watchlist")} />
           </div>
         </section>
 

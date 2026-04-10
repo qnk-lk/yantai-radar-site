@@ -119,18 +119,16 @@ export function CompetitorMapPanel({
 
       <div className="grid gap-3">
         <div className="rounded-[1.2rem] border border-[var(--color-line)] bg-[var(--color-card-soft)] px-4 py-3 text-sm leading-7 text-[var(--color-ink)]/82">
-          {selectedCompany ? (
-            t("map.linkedTo", {
+          {selectedCompany
+            ? t("map.linkedTo", {
                 name: selectedCompany.companyName,
                 path: selectedLocation
                   ? `${selectedLocation.provinceName} / ${selectedLocation.cityName}`
                   : `中国 / ${selectedCompany.city}`,
               })
-          ) : companies.length ? (
-            status
-          ) : (
-            t("map.noData")
-          )}
+            : companies.length
+              ? status
+              : t("map.noData")}
         </div>
 
         <div className="rounded-[1.2rem] border border-[var(--color-line)] bg-white px-4 py-3 text-xs leading-6 text-[var(--color-muted)]">
