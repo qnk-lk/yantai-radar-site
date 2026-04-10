@@ -1,0 +1,78 @@
+name: Sync OpenClaw Radar Config
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - openclaw-config/**
+      - .github/workflows/sync-openclaw-radar-config.yml
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SSH_KEY_B64: ${{ secrets.SERVER_SSH_KEY_B64 }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s' "$SERVER_SSH_KEY_B64" | base64 --decode > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${SERVER_PORT:-22}" "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Sync knowledge files to OpenClaw workspace
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -p "${SERVER_PORT:-22}" "${SERVER_USER}@${SERVER_HOST}" "mkdir -p ~/.openclaw/workspace/knowledge/shandong-mes-wms-qms-radar"
+          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" openclaw-config/ "${SERVER_USER}@${SERVER_HOST}:~/.openclaw/workspace/knowledge/shandong-mes-wms-qms-radar/"
+
+      - name: Refresh cron prompt entrypoint
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -p "${SERVER_PORT:-22}" "${SERVER_USER}@${SERVER_HOST}" "python3 - <<'PY'
+          import os
+          import shutil
+          import subprocess
+          import textwrap
+
+          job_id = 'dcd09b3c-5a16-4897-8a67-63bbc73f9ee4'
+          message = textwrap.dedent('''\
+          你现在执行“山东 MES / WMS / QMS 销售线索雷达”。
+
+          先读取并严格遵守以下文件：
+          - AGENTS.md
+          - MEMORY.md
+          - knowledge/shandong-mes-wms-qms-radar/daily-sales-prompt-auto.txt
+
+          完成后严格按文件要求输出日报。
+          ''').strip()
+
+          openclaw_bin = shutil.which('openclaw') or os.path.expanduser('~/.npm-global/bin/openclaw')
+          subprocess.run(
+              [openclaw_bin, 'cron', 'edit', job_id, '--message', message],
+              check=True,
+          )
+          PY"
+
+      - name: Verify synced files
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -p "${SERVER_PORT:-22}" "${SERVER_USER}@${SERVER_HOST}" "sed -n '1,40p' ~/.openclaw/workspace/knowledge/shandong-mes-wms-qms-radar/daily-sales-prompt-auto.txt && printf '\n---\n' && sed -n '1,40p' ~/.openclaw/workspace/knowledge/shandong-mes-wms-qms-radar/source-whitelist.md"
