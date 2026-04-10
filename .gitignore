@@ -25,6 +25,10 @@
 *.pem
 __pycache__/
 *.pyc
+.playwright-cli/
+output/
+.next-dev.log
+.tmp-next-webpack*.log
 
 # debug
 npm-debug.log*

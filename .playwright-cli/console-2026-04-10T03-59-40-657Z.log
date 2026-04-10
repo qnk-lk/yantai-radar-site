@@ -1,3 +1,0 @@
-[     275ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:4173/api/radar/latest?t=1775793580921:0
-[     276ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:4173/api/admin/divisions?t=1775793580923:0
-[     276ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:4173/api/competitors?t=1775793580923:0

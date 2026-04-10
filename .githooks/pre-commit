@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if [ -z "$staged_files" ]; then
+  exit 0
+fi
+
+blocked_paths=""
+
+while IFS= read -r path; do
+  case "$path" in
+    .playwright-cli/*|.next/*|out/*|output/*|*.log|.tmp-next-webpack*.log)
+      blocked_paths="${blocked_paths}${path}
+"
+      ;;
+  esac
+done <<EOF
+$staged_files
+EOF
+
+if [ -n "$blocked_paths" ]; then
+  printf '%s\n' "以下文件属于本地临时产物，已阻止提交："
+  printf '%s' "$blocked_paths"
+  printf '\n%s\n' "如果你确实要提交这些文件，可以先清理暂存区，或使用 git commit --no-verify 跳过钩子。"
+  exit 1
+fi
