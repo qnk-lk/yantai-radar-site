@@ -1,0 +1,40 @@
+请执行结构化调研，并且只输出合法 JSON，不要输出 Markdown，不要解释。
+
+目标：
+以“烟台利道科技有限公司”的公开服务范围为基准，只筛选烟台与青岛两座城市内，以服务制造业客户为主、且与 MES、WMS、QMS、工厂信息化、智能制造、工业软件实施、数字化工厂、生产追溯、仓储系统、质量系统、ERP、PLM、SCADA、APS 相关的同行公司。
+
+筛选规则：
+- 必须有公开证据支持它服务制造业，或明确提供上述相关服务。
+- 排除纯硬件代理、纯设备制造商、纯通用 IT 外包、纯财税软件公司。
+- 排序先烟台本地，再青岛。
+- 同城内优先保留证据更强、制造业相关性更高的公司。
+- 至少给 8 家，最多给 14 家。
+- 每家公司至少 1 条证据，优先官网、案例页、产品页、招聘页、政府、协会信息。
+- URL 不要编造，证据不足就不要写进去。
+
+只输出如下 JSON：
+{
+  "baseline": {
+    "companyName": "",
+    "serviceScopeSummary": "",
+    "evidence": [
+      {"source": "", "url": "", "note": ""}
+    ]
+  },
+  "competitors": [
+    {
+      "rank": 1,
+      "companyName": "",
+      "city": "",
+      "distanceTier": "烟台本地/青岛重点",
+      "serviceFit": "高/中",
+      "manufacturingFocus": "",
+      "coreServices": ["", ""],
+      "whyRelevant": "",
+      "evidenceStrength": "高/中",
+      "evidence": [
+        {"source": "", "url": "", "note": ""}
+      ]
+    }
+  ]
+}

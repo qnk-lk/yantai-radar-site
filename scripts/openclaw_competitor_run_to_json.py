@@ -20,14 +20,23 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Convert an OpenClaw competitor research run into the site competitors.json format."
     )
-    parser.add_argument("--input", required=True, help="Path to the OpenClaw agent JSON result.")
+    parser.add_argument("--input", help="Path to the OpenClaw agent JSON result.")
+    parser.add_argument(
+        "--cron-runs-file",
+        help="Path to an OpenClaw cron run JSONL file whose latest finished summary contains the JSON payload.",
+    )
     parser.add_argument("--output", required=True, help="Path to the competitors.json output.")
     parser.add_argument(
         "--allowed-cities",
         default="",
         help="Comma-separated city allowlist. When set, competitors outside the list are dropped.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if bool(args.input) == bool(args.cron_runs_file):
+        parser.error("Exactly one of --input or --cron-runs-file must be provided.")
+
+    return args
 
 
 def strip_code_fence(text: str) -> str:
@@ -45,6 +54,61 @@ def format_updated_at(timestamp_ms: int | None) -> str:
 
     dt = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).astimezone(SHANGHAI_TZ)
     return dt.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def load_from_agent_result(input_path: Path) -> tuple[dict[str, Any], int | None]:
+    raw = json.loads(input_path.read_text(encoding="utf-8"))
+    payloads = raw.get("result", {}).get("payloads", [])
+
+    if not payloads:
+        raise RuntimeError("OpenClaw run did not contain payloads")
+
+    text = payloads[0].get("text", "")
+    if not text:
+        raise RuntimeError("OpenClaw payload text is empty")
+
+    if "usage limit" in text.lower():
+        raise RuntimeError(text.strip())
+
+    generated_at = (
+        raw.get("result", {})
+        .get("meta", {})
+        .get("systemPromptReport", {})
+        .get("generatedAt")
+        or raw.get("ts")
+    )
+
+    return json.loads(strip_code_fence(text)), generated_at
+
+
+def load_from_cron_runs(runs_path: Path) -> tuple[dict[str, Any], int | None]:
+    latest_summary: str | None = None
+    latest_timestamp: int | None = None
+
+    with runs_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            payload = json.loads(line)
+
+            if payload.get("action") != "finished":
+                continue
+
+            summary = payload.get("summary")
+            timestamp = payload.get("ts") or payload.get("runAtMs")
+
+            if not summary or not timestamp:
+                continue
+
+            if latest_timestamp is None or int(timestamp) > latest_timestamp:
+                latest_summary = summary
+                latest_timestamp = int(timestamp)
+
+    if latest_summary is None:
+        raise RuntimeError(f"No finished competitor summary found in {runs_path}")
+
+    if "usage limit" in latest_summary.lower():
+        raise RuntimeError(latest_summary.strip())
+
+    return json.loads(strip_code_fence(latest_summary)), latest_timestamp
 
 
 def normalize_payload(
@@ -69,23 +133,11 @@ def normalize_payload(
 
 def main() -> int:
     args = parse_args()
-    input_path = Path(args.input)
     output_path = Path(args.output)
-
-    raw = json.loads(input_path.read_text(encoding="utf-8"))
-    payloads = raw.get("result", {}).get("payloads", [])
-
-    if not payloads:
-        raise RuntimeError("OpenClaw run did not contain payloads")
-
-    text = payloads[0].get("text", "")
-    if not text:
-        raise RuntimeError("OpenClaw payload text is empty")
-
-    if "usage limit" in text.lower():
-        raise RuntimeError(text.strip())
-
-    parsed = json.loads(strip_code_fence(text))
+    if args.input:
+        parsed, generated_at = load_from_agent_result(Path(args.input))
+    else:
+        parsed, generated_at = load_from_cron_runs(Path(args.cron_runs_file))
     allowed_cities = {
         city.strip() for city in args.allowed_cities.split(",") if city.strip()
     }
@@ -108,13 +160,6 @@ def main() -> int:
         note = f"当前结果只保留 {city_summary} 两地同行；后续可继续补强公司证据与最新动态。"
         status = f"已同步 {len(filtered)} 家{city_summary}制造服务同行公司。"
 
-    generated_at = (
-        raw.get("result", {})
-        .get("meta", {})
-        .get("systemPromptReport", {})
-        .get("generatedAt")
-        or raw.get("ts")
-    )
     updated_at = format_updated_at(generated_at)
     normalized = normalize_payload(parsed, updated_at, note, status)
 
