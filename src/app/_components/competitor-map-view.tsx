@@ -11,6 +11,7 @@ import {
   type CompetitorCompany,
   getCompetitorKey,
 } from "./competitor-types";
+import { formatAdminName, getServiceFitLevel } from "./admin-labels";
 
 type CompanyMarker = {
   key: string;
@@ -150,7 +151,7 @@ export function CompetitorMapView({
   selectedKey: string | null;
   onSelect: (key: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const markers = useMemo(() => buildMarkers(companies), [companies]);
   const baselineMarker = useMemo(() => buildBaselineMarker(baseline), [baseline]);
   const selectedMarker = useMemo(
@@ -187,7 +188,7 @@ export function CompetitorMapView({
           className="competitor-map-tooltip competitor-map-tooltip-baseline"
         >
           <span>
-            {baselineMarker.companyName} · {t("map.baselineMarker")}
+            {baselineMarker.companyName} · {t("map.baseline_marker")}
           </span>
         </Tooltip>
       </Marker>
@@ -203,10 +204,13 @@ export function CompetitorMapView({
         >
           <Tooltip direction="top" offset={[0, -10]} opacity={1} className="competitor-map-tooltip">
             <span>
-              {t("map.competitorTooltip", {
+              {t("map.competitor_tooltip", {
                 name: marker.company.companyName,
-                city: marker.company.city,
-                fit: marker.company.serviceFit,
+                city: formatAdminName(marker.company.city, i18n.resolvedLanguage),
+                fit:
+                  getServiceFitLevel(marker.company.serviceFit) !== null
+                    ? t(`deck.fit_levels.${getServiceFitLevel(marker.company.serviceFit)}`)
+                    : marker.company.serviceFit,
               })}
             </span>
           </Tooltip>

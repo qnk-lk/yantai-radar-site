@@ -44,7 +44,7 @@ function getWeatherIcon(code: number | null) {
 }
 
 function WeatherStatusIcon({ code }: { code: number | null }) {
-  const className = "text-3xl text-[var(--color-accent)]";
+  const className = "text-3xl text-(--color-accent)";
   const iconType = getWeatherIcon(code);
 
   switch (iconType) {
@@ -109,7 +109,7 @@ export function LocationWeatherClock() {
           address.town ??
           address.county ??
           address.state_district ??
-          t("topbar.defaultLocation");
+          t("topbar.default_location");
 
         setWeather({
           city,
@@ -176,23 +176,23 @@ export function LocationWeatherClock() {
   if (status === "denied") {
     statusText = "";
   } else if (status === "weather-error") {
-    statusText = t("topbar.weatherUnavailable");
+    statusText = t("topbar.weather_unavailable");
   } else if (status === "ready") {
     statusText =
       weather.temperature === null
-        ? t("topbar.weatherLoading")
+        ? t("topbar.weather_loading")
         : `${Math.round(weather.temperature)}°C`;
   }
 
   return (
-    <div className="w-full flex items-center max-w-[24rem] rounded-[1.25rem]   ">
+    <div className="flex w-full max-w-96 items-center rounded-[1.25rem]">
       <div className="min-w-0 space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--color-muted)]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-(--color-muted)">
           {weather.city}
         </p>
       </div>
 
-      <div className="shrink-0 flex items-center gap-2 rounded-full  px-3 py-2 text-[var(--color-ink)]">
+      <div className="flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-(--color-ink)">
         <WeatherStatusIcon code={weather.weatherCode} />
         <span className="text-sm font-medium">{statusText}</span>
       </div>

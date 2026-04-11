@@ -39,6 +39,28 @@ a {
   text-decoration: none;
 }
 
+button:not(:disabled),
+a[href],
+[role="button"],
+[role="option"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="tab"],
+[role="switch"],
+[aria-haspopup="true"]:not([aria-disabled="true"]),
+.leaflet-interactive,
+.leaflet-control-zoom a,
+.radar-select__control,
+.radar-select__option,
+.radar-select__dropdown-indicator {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 .competitor-leaflet-map {
   height: 31rem;
   width: 100%;
@@ -179,6 +201,134 @@ a {
 .competitor-card-marquee:hover .competitor-card-track,
 .competitor-card-marquee.is-paused .competitor-card-track {
   animation-play-state: paused;
+}
+
+.competitor-city-cascader-popup {
+  z-index: 1200 !important;
+  contain: layout paint;
+  width: max-content;
+  max-width: calc(100vw - 3rem);
+  overflow-x: hidden;
+  overflow-y: hidden;
+  border: 1px solid rgba(167, 128, 94, 0.26);
+  border-radius: 1.1rem;
+  background: rgba(255, 250, 241, 0.98);
+  box-shadow: 0 18px 40px rgba(69, 49, 28, 0.14);
+}
+
+.competitor-city-cascader-popup.rc-cascader-dropdown-hidden {
+  display: none;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menus {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  width: max-content;
+  max-width: calc(100vw - 3rem);
+  overflow-x: auto;
+  background: rgba(255, 250, 241, 0.98);
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menu {
+  flex: none;
+  contain: content;
+  width: 13rem;
+  min-width: 13rem;
+  max-height: 18rem;
+  margin: 0;
+  padding: 0.55rem;
+  list-style: none;
+  border-right: 1px solid rgba(218, 200, 172, 0.8);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menu:last-child {
+  border-right: 0;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menu:last-child:not(:first-child) {
+  width: 16rem;
+  min-width: 16rem;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menu-item {
+  position: relative;
+  display: flex;
+  min-width: 10rem;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 2rem 0.7rem 0.55rem;
+  border-radius: 0.85rem;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menu-item:hover,
+.competitor-city-cascader-popup .competitor-city-cascader-menu-item-active {
+  background: rgba(158, 69, 32, 0.1);
+  color: var(--color-accent);
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menu-item-disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-checkbox {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid rgba(158, 69, 32, 0.28);
+  border-radius: 0.3rem;
+  background: white;
+  color: white;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-checkbox-checked,
+.competitor-city-cascader-popup .competitor-city-cascader-checkbox-indeterminate {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-checkbox-checked::after {
+  content: "✓";
+  color: white;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-checkbox-indeterminate::after {
+  content: "";
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: white;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menu-item-content {
+  min-width: 0;
+  flex: 1;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.competitor-city-cascader-popup .competitor-city-cascader-menu-item-expand-icon {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  color: var(--color-muted);
+  transform: translateY(-50%);
 }
 
 @keyframes competitor-card-scroll {

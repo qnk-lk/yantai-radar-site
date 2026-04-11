@@ -27,7 +27,7 @@ export function LanguageSwitcher() {
     languageOptions.find((item) => item.value === i18n.resolvedLanguage) ?? languageOptions[0];
 
   return (
-    <div className="w-full md:w-[8rem] md:justify-self-end">
+    <div className="w-full md:w-32 md:justify-self-end">
       <Select<LanguageOption, false>
         instanceId="language-switcher"
         classNamePrefix="radar-select"

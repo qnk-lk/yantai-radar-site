@@ -27,6 +27,7 @@ __pycache__/
 *.pyc
 .playwright-cli/
 output/
+.tmp/
 .next-dev.log
 .tmp-next-webpack*.log
 
