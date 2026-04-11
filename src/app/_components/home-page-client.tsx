@@ -78,44 +78,6 @@ function withApiBase(path: string) {
   return publicApiBaseUrl ? `${publicApiBaseUrl}${path}` : path;
 }
 
-function parseUpdatedAt(value: string): number | null {
-  const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?/
-  );
-
-  if (!match) {
-    return null;
-  }
-
-  const [, year, month, day, hour, minute, second = "00"] = match;
-
-  return Date.UTC(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second)
-  );
-}
-
-function pickLatestUpdatedAt(...values: string[]) {
-  const fallback = values.find((value) => value.trim().length) ?? "等待首次自动同步";
-  let latestValue = fallback;
-  let latestTimestamp = -1;
-
-  for (const value of values) {
-    const timestamp = parseUpdatedAt(value);
-
-    if (timestamp !== null && timestamp > latestTimestamp) {
-      latestTimestamp = timestamp;
-      latestValue = value;
-    }
-  }
-
-  return latestValue;
-}
-
 async function loadJson<T>(url: string): Promise<T> {
   const response = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
 
@@ -357,11 +319,6 @@ export default function Home() {
     ]
   );
 
-  const latestDisplayUpdatedAt = useMemo(
-    () => pickLatestUpdatedAt(data.updatedAt, competitorData.updatedAt),
-    [competitorData.updatedAt, data.updatedAt]
-  );
-
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-ink)]">
       <div className="absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_top_left,_rgba(182,107,58,0.24),_transparent_48%),radial-gradient(circle_at_75%_18%,_rgba(53,97,108,0.18),_transparent_42%)]" />
@@ -435,7 +392,7 @@ export default function Home() {
                 companies={competitorData.competitors}
                 status={competitorData.status}
                 note={competitorData.note}
-                updatedAt={latestDisplayUpdatedAt}
+                updatedAt={competitorData.updatedAt}
                 selectedKey={selectedMapCompetitorKey}
                 onSelect={(key) => {
                   setSelectedMapCompetitorKey(key);
