@@ -4,9 +4,9 @@ import {
   createDatabase,
   ensureParentDirectory,
   ensureSchema,
+  importDocument,
   readJsonPath,
   resolveConfig,
-  writeDocument,
 } from "./lib/store.mjs";
 
 function parseArgs(argv) {
@@ -52,7 +52,7 @@ const payload = await readJsonPath(args.input);
 await ensureParentDirectory(config.dbPath);
 const db = createDatabase(config.dbPath);
 ensureSchema(db);
-writeDocument(db, args.key, payload, args.source);
+importDocument(db, args.key, payload, args.source);
 db.close();
 
 console.log(

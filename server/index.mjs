@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 
-import { initializeStore, readDocument, resolveConfig } from "./lib/store.mjs";
+import { initializeStore, readCompetitorUpdates, readDocument, resolveConfig } from "./lib/store.mjs";
 
 function parseCliArgs(argv) {
   const options = {};
@@ -72,6 +72,14 @@ function buildApp(config, db) {
     }
 
     return document.payload;
+  });
+
+  app.get("/api/competitors/updates", async (request) => {
+    const limit = Number(request.query?.limit);
+
+    return {
+      items: readCompetitorUpdates(db, limit),
+    };
   });
 
   app.get("/api/admin/divisions", async (_request, reply) => {
