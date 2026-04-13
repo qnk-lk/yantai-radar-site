@@ -15,18 +15,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CRON_RUNS_FILE=""
 CURRENT_STAMP=""
+CRON_TIMESTAMP=""
+CRON_STAMP=""
+INPUT_MTIME=""
+INPUT_SIZE=""
+INPUT_MTIME_MS=""
+INPUT_STAMP=""
+USE_INPUT_PATH="false"
 
 if [[ -f "$INPUT_PATH" ]]; then
   if [[ ! -s "$INPUT_PATH" ]]; then
-    echo "competitor input is empty, skip"
-    exit 0
+    echo "competitor input is empty, removing stale file and falling back to cron runs"
+    rm -f "$INPUT_PATH"
+  else
+    INPUT_MTIME="$(stat -c '%Y' "$INPUT_PATH")"
+    INPUT_SIZE="$(stat -c '%s' "$INPUT_PATH")"
+    INPUT_MTIME_MS="$(( INPUT_MTIME * 1000 ))"
+    INPUT_STAMP="input:${INPUT_MTIME}:${INPUT_SIZE}"
   fi
-  CURRENT_STAMP="$(stat -c '%Y:%s' "$INPUT_PATH")"
-else
-  if [[ ! -f "$OPENCLAW_JOBS_PATH" ]]; then
-    echo "openclaw jobs file not found: $OPENCLAW_JOBS_PATH"
-    exit 0
-  fi
+fi
+
+if [[ -f "$OPENCLAW_JOBS_PATH" ]]; then
 
   CRON_JOB_ID="$(python3 - <<'PY' "$OPENCLAW_JOBS_PATH" "$COMPETITOR_CRON_NAME"
 import json
@@ -53,10 +62,8 @@ PY
 
   if [[ ! -f "$CRON_RUNS_FILE" ]]; then
     echo "competitor cron runs file not found: $CRON_RUNS_FILE"
-    exit 0
-  fi
-
-  CURRENT_STAMP="$(python3 - <<'PY' "$CRON_RUNS_FILE"
+  else
+    CRON_TIMESTAMP="$(python3 - <<'PY' "$CRON_RUNS_FILE"
 import json
 import sys
 from pathlib import Path
@@ -79,10 +86,25 @@ if latest is not None:
 PY
 )"
 
-  if [[ -z "$CURRENT_STAMP" ]]; then
-    echo "competitor cron has no finished runs yet, skip"
-    exit 0
+    if [[ -n "$CRON_TIMESTAMP" ]]; then
+      CRON_STAMP="cron:${CRON_TIMESTAMP}"
+    fi
   fi
+else
+  echo "openclaw jobs file not found: $OPENCLAW_JOBS_PATH"
+fi
+
+if [[ -n "$INPUT_STAMP" && ( -z "$CRON_TIMESTAMP" || "$INPUT_MTIME_MS" -gt "$CRON_TIMESTAMP" ) ]]; then
+  CURRENT_STAMP="$INPUT_STAMP"
+  USE_INPUT_PATH="true"
+elif [[ -n "$CRON_STAMP" ]]; then
+  CURRENT_STAMP="$CRON_STAMP"
+elif [[ -n "$INPUT_STAMP" ]]; then
+  CURRENT_STAMP="$INPUT_STAMP"
+  USE_INPUT_PATH="true"
+else
+  echo "competitor input and cron runs are both unavailable, skip"
+  exit 0
 fi
 
 mkdir -p "$TEMP_DIR"
@@ -97,7 +119,7 @@ if [[ "$CURRENT_STAMP" == "$LAST_STAMP" ]]; then
   exit 0
 fi
 
-if [[ -f "$INPUT_PATH" ]]; then
+if [[ "$USE_INPUT_PATH" == "true" ]]; then
   python3 "$SCRIPT_DIR/openclaw_competitor_run_to_json.py" \
     --input "$INPUT_PATH" \
     --output "$TEMP_JSON" \

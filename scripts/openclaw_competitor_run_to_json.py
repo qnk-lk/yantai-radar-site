@@ -42,10 +42,39 @@ def parse_args() -> argparse.Namespace:
 def strip_code_fence(text: str) -> str:
     stripped = text.strip()
     if stripped.startswith("```"):
-      lines = stripped.splitlines()
-      if len(lines) >= 3:
-          return "\n".join(lines[1:-1]).strip()
+        lines = stripped.splitlines()
+        if len(lines) >= 3:
+            return "\n".join(lines[1:-1]).strip()
     return stripped
+
+
+def parse_json_payload(text: str) -> dict[str, Any]:
+    candidate = strip_code_fence(text)
+
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError as first_error:
+        decoder = json.JSONDecoder()
+
+        for index, char in enumerate(candidate):
+            if char not in "[{":
+                continue
+
+            try:
+                parsed, end = decoder.raw_decode(candidate[index:])
+            except json.JSONDecodeError:
+                continue
+
+            trailing = candidate[index + end :].strip()
+            if not trailing:
+                break
+        else:
+            raise first_error
+
+    if not isinstance(parsed, dict):
+        raise ValueError("OpenClaw output must decode to a JSON object")
+
+    return parsed
 
 
 def format_updated_at(timestamp_ms: int | None) -> str:
@@ -78,11 +107,48 @@ def load_from_agent_result(input_path: Path) -> tuple[dict[str, Any], int | None
         or raw.get("ts")
     )
 
-    return json.loads(strip_code_fence(text)), generated_at
+    return parse_json_payload(text), generated_at
+
+
+def resolve_session_path(session_id: str) -> Path | None:
+    agents_root = Path.home() / ".openclaw" / "agents"
+
+    direct_path = agents_root / "main" / "sessions" / f"{session_id}.jsonl"
+    if direct_path.exists():
+        return direct_path
+
+    for candidate in agents_root.glob(f"*/sessions/{session_id}.jsonl"):
+        if candidate.exists():
+            return candidate
+
+    return None
+
+
+def load_from_session_file(session_path: Path) -> dict[str, Any]:
+    latest_text: str | None = None
+
+    with session_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            payload = json.loads(line)
+            if payload.get("type") != "message":
+                continue
+
+            message = payload.get("message", {})
+            if message.get("role") != "assistant":
+                continue
+
+            for content_item in message.get("content", []):
+                if content_item.get("type") == "text" and content_item.get("text"):
+                    latest_text = content_item["text"]
+
+    if latest_text is None:
+        raise RuntimeError(f"No assistant text found in session file {session_path}")
+
+    return parse_json_payload(latest_text)
 
 
 def load_from_cron_runs(runs_path: Path) -> tuple[dict[str, Any], int | None]:
-    latest_summary: str | None = None
+    latest_run: dict[str, Any] | None = None
     latest_timestamp: int | None = None
 
     with runs_path.open("r", encoding="utf-8") as handle:
@@ -99,16 +165,35 @@ def load_from_cron_runs(runs_path: Path) -> tuple[dict[str, Any], int | None]:
                 continue
 
             if latest_timestamp is None or int(timestamp) > latest_timestamp:
-                latest_summary = summary
+                latest_run = payload
                 latest_timestamp = int(timestamp)
 
-    if latest_summary is None:
+    if latest_run is None:
         raise RuntimeError(f"No finished competitor summary found in {runs_path}")
 
+    latest_summary = latest_run.get("summary", "")
     if "usage limit" in latest_summary.lower():
         raise RuntimeError(latest_summary.strip())
 
-    return json.loads(strip_code_fence(latest_summary)), latest_timestamp
+    session_id = latest_run.get("sessionId")
+    session_path = resolve_session_path(session_id) if session_id else None
+
+    parse_errors: list[str] = []
+
+    if session_path is not None:
+        try:
+            return load_from_session_file(session_path), latest_timestamp
+        except Exception as error:
+            parse_errors.append(f"session {session_path}: {error}")
+
+    try:
+        return parse_json_payload(latest_summary), latest_timestamp
+    except Exception as error:
+        parse_errors.append(f"summary: {error}")
+
+    raise RuntimeError(
+        f"Could not parse competitor payload from {runs_path}. Details: {'; '.join(parse_errors)}"
+    )
 
 
 def normalize_payload(
