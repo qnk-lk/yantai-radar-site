@@ -21,6 +21,9 @@ export const DOCUMENT_DEFINITIONS = {
   competitors: {
     fileName: "competitors.json",
   },
+  recruitmentLeads: {
+    fileName: "recruitment-leads.json",
+  },
   adminDivisions: {
     fileName: "china-admin-divisions.json",
   },

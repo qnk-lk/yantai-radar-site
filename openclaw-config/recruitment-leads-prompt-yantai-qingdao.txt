@@ -1,0 +1,90 @@
+请执行“招聘信号反推制造业数字化线索”调研，并且只输出合法 JSON，不要输出 Markdown，不要解释。
+
+目标：
+只围绕“烟台、青岛”两座城市，通过招聘网站公开招聘信息，反推出可能存在 MES、WMS、QMS、MOM、SCADA、智能制造、数字化工厂、工业互联网、生产追溯、仓储管理、质量管理、设备数据采集等需求的公司。
+
+这不是日报任务，也不是同行地图任务。它是独立的招聘信号任务。
+
+平台优先级：
+1. BOSS直聘：优先查，但不要绕过验证码、安全校验或登录限制。
+2. 智联招聘：优先查，重点看公司页和职位详情。
+3. 前程无忧、猎聘、齐鲁人才网：作为补充来源。
+
+抓取边界：
+- 不做全量抓取。
+- 每次最多输出 10 家有效公司线索，达到 10 家后停止。
+- 按“有效公司”去重，不按岗位数量计数。
+- 同一家公司多个岗位要合并到同一条线索。
+- 只保留烟台、青岛。
+- 如果平台触发安全校验、验证码、登录墙或无法访问，只记录在 platformCoverage，不要尝试绕过。
+- URL 不要编造，无法确认的 URL 不要写。
+- 重点保留最近发布、仍在招聘、描述中明确命中制造业数字化关键词的岗位。
+
+关键词：
+- 强相关：MES、WMS、QMS、MOM、SCADA、智能制造、数字化工厂、工业互联网
+- 中相关：ERP、APS、TPM、PLM、SRM、生产管理系统、仓储管理系统、质量追溯、设备数据采集、信息化主管、数字化负责人
+
+反推分类：
+- 潜在客户：制造企业招聘 MES/WMS/QMS/智能制造/信息化相关岗位。
+- 同行：软件公司、工业互联网公司、自动化公司、系统集成商招聘 MES 实施、售前、交付、项目经理等岗位。
+- 合作伙伴：自动化、设备集成、ERP实施、数据采集公司，有互补合作可能。
+- 待判断：证据不足但有弱相关岗位信号。
+
+线索强度：
+- 高：同一家公司有多个强相关岗位，或岗位描述明确写 MES/WMS/QMS/智能制造项目建设。
+- 中：只有 1 个强相关岗位，或多个中相关岗位。
+- 低：只有弱相关关键词，需二次核验。
+
+只输出如下 JSON：
+{
+  "strategy": {
+    "cities": ["烟台", "青岛"],
+    "targetCompanyLimit": 10,
+    "primaryPlatforms": ["BOSS直聘", "智联招聘"],
+    "fallbackPlatforms": ["前程无忧", "猎聘", "齐鲁人才网"],
+    "keywords": ["MES", "WMS", "QMS", "智能制造", "数字化工厂", "工业互联网"]
+  },
+  "platformCoverage": [
+    {
+      "platform": "",
+      "status": "ok/limited/blocked/no_result",
+      "querySummary": "",
+      "effectiveCompanyCount": 0,
+      "note": ""
+    }
+  ],
+  "leads": [
+    {
+      "rank": 1,
+      "companyName": "",
+      "city": "烟台/青岛",
+      "companyCategory": "制造企业/软件公司/工业互联网公司/自动化公司/系统集成商/待判断",
+      "leadType": "潜在客户/同行/合作伙伴/待判断",
+      "leadStrength": "高/中/低",
+      "signalSummary": "",
+      "inferredNeed": "",
+      "matchedKeywords": ["MES", "WMS"],
+      "matchedJobs": [
+        {
+          "platform": "",
+          "jobTitle": "",
+          "city": "",
+          "salary": "",
+          "publishedAt": "",
+          "url": "",
+          "keywordHits": ["MES"],
+          "descriptionEvidence": ""
+        }
+      ],
+      "evidence": [
+        {
+          "source": "",
+          "url": "",
+          "note": ""
+        }
+      ],
+      "recommendedAction": "",
+      "riskNotes": ""
+    }
+  ]
+}

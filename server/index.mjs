@@ -82,6 +82,20 @@ function buildApp(config, db) {
     };
   });
 
+  app.get("/api/recruitment/leads", async (_request, reply) => {
+    const document = readDocument(db, "recruitmentLeads");
+
+    if (!document) {
+      reply.code(404);
+      return {
+        ok: false,
+        message: "Recruitment lead data not found",
+      };
+    }
+
+    return document.payload;
+  });
+
   app.get("/api/admin/divisions", async (_request, reply) => {
     const document = readDocument(db, "adminDivisions");
 

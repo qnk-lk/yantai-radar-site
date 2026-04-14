@@ -1,0 +1,14 @@
+{
+  "updatedAt": "等待首次自动同步",
+  "status": "等待 OpenClaw 招聘信号反推任务产出。",
+  "note": "该数据独立于日报和同行地图，只用于根据招聘岗位反推烟台、青岛制造业数字化线索。",
+  "strategy": {
+    "cities": ["烟台", "青岛"],
+    "targetCompanyLimit": 10,
+    "primaryPlatforms": ["BOSS直聘", "智联招聘"],
+    "fallbackPlatforms": ["前程无忧", "猎聘", "齐鲁人才网"],
+    "keywords": ["MES", "WMS", "QMS", "智能制造", "数字化工厂", "工业互联网"]
+  },
+  "platformCoverage": [],
+  "leads": []
+}
