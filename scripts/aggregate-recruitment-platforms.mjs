@@ -47,6 +47,23 @@ function compactText(value) {
     .trim();
 }
 
+function getSortKey(value) {
+  const match = String(value || "").match(
+    /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/
+  );
+
+  return match ? match.slice(1).join("") : "";
+}
+
+function pickNewestTimestamp(...values) {
+  const validValues = values.filter((value) => getSortKey(value));
+  if (!validValues.length) {
+    return compactText(values.find(Boolean) || "");
+  }
+
+  return [...validValues].sort((left, right) => getSortKey(right).localeCompare(getSortKey(left)))[0];
+}
+
 function getShanghaiUpdatedAt() {
   const date = new Date();
   const formatter = new Intl.DateTimeFormat("zh-CN", {
@@ -131,6 +148,7 @@ function mergeLeadRecords(left, right) {
   return {
     ...left,
     rank: 0,
+    retrievedAt: pickNewestTimestamp(left.retrievedAt, right.retrievedAt),
     companyCategory: preferKnownValue(left.companyCategory, right.companyCategory),
     leadType: preferKnownValue(left.leadType, right.leadType),
     leadStrength,
@@ -194,6 +212,7 @@ async function main() {
       const key = `${lead.city || ""}::${lead.companyName || ""}`;
       const enrichedLead = {
         ...lead,
+        retrievedAt: compactText(lead.retrievedAt || payload.updatedAt),
         sourcePlatforms: uniqueBy(
           [
             ...(lead.sourcePlatforms || []),

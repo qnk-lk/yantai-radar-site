@@ -23,6 +23,7 @@ export type SalesIntelDetailRow = {
 export type SalesIntelItem = {
   id: string;
   kind: "report" | "recruitment";
+  retrievedAt?: string | null;
   category: string;
   title: string;
   subtitle: string;
@@ -41,6 +42,7 @@ export type SalesIntelItem = {
 
 export type SalesIntelData = {
   updatedAt: string;
+  todaySearchItems?: string[];
   summary: {
     focus: string;
     status: string;

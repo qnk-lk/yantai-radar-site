@@ -14,6 +14,16 @@ export type CompetitorCompany = {
   rank: number;
   companyName: string;
   city: string;
+  province?: string;
+  district?: string;
+  location?: string;
+  address?: string;
+  poiName?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  geocodeSource?: string;
+  geocodeConfidence?: string;
+  geocodedAt?: string;
   distanceTier: string;
   serviceFit: string;
   manufacturingFocus: string;

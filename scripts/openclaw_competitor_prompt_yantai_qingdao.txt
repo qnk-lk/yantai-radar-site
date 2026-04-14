@@ -11,6 +11,8 @@
 - 至少给 8 家，最多给 14 家。
 - 每家公司至少 1 条证据，优先官网、案例页、产品页、招聘页、政府、协会信息。
 - URL 不要编造，证据不足就不要写进去。
+- 如能查到公开办公地点、园区位置、街道门牌、楼宇/大厦名称或可识别 POI，请补充到 location/address/poiName；查不到可以留空。
+- 不要编造经纬度；latitude/longitude 如果没有公开且可核验的位置依据，请填 null。
 
 只输出如下 JSON：
 {
@@ -25,13 +27,21 @@
     {
       "rank": 1,
       "companyName": "",
+      "province": "",
       "city": "",
+      "district": "",
+      "location": "",
+      "address": "",
+      "poiName": "",
+      "latitude": null,
+      "longitude": null,
       "distanceTier": "烟台本地/青岛重点",
       "serviceFit": "高/中",
       "manufacturingFocus": "",
       "coreServices": ["", ""],
       "whyRelevant": "",
       "evidenceStrength": "高/中",
+      "locationEvidence": {"source": "", "url": "", "note": ""},
       "evidence": [
         {"source": "", "url": "", "note": ""}
       ]

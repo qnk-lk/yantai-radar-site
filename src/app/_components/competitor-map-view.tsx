@@ -30,30 +30,9 @@ type BaselineMarker = {
 const DEFAULT_CENTER: [number, number] = [35.8617, 104.1954];
 const DEFAULT_ZOOM = 5;
 
-const CITY_COORDINATES: Record<string, { lat: number; lon: number }> = {
-  烟台: { lat: 37.4638, lon: 121.4479 },
-  青岛: { lat: 36.0671, lon: 120.3826 },
-};
-
 const LIDAO_CITIC_TOWER_COORDINATES = {
   lat: 37.5635523,
   lon: 121.2373543,
-};
-
-const CITY_OFFSETS: Record<string, Array<{ lat: number; lon: number }>> = {
-  烟台: [
-    { lat: 0, lon: 0 },
-    { lat: -0.06, lon: 0.1 },
-    { lat: 0.08, lon: -0.1 },
-  ],
-  青岛: [
-    { lat: 0, lon: 0 },
-    { lat: -0.07, lon: 0.1 },
-    { lat: 0.08, lon: -0.08 },
-    { lat: 0.12, lon: 0.06 },
-    { lat: -0.11, lon: -0.09 },
-    { lat: 0.02, lon: 0.18 },
-  ],
 };
 
 function createCompanyIcon(selected: boolean): DivIcon {
@@ -74,28 +53,26 @@ function createBaselineIcon(): DivIcon {
   });
 }
 
+function normalizeCoordinate(value: number | string | null | undefined) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
 function buildMarkers(companies: CompetitorCompany[]) {
-  const cityCounters = new Map<string, number>();
-
   return companies.flatMap((company) => {
-    const city = company.city in CITY_COORDINATES ? company.city : null;
+    const lat = normalizeCoordinate(company.latitude);
+    const lon = normalizeCoordinate(company.longitude);
 
-    if (!city) {
+    if (lat === null || lon === null) {
       return [];
     }
-
-    const base = CITY_COORDINATES[city];
-    const index = cityCounters.get(city) ?? 0;
-    const offset = CITY_OFFSETS[city][index] ?? { lat: 0, lon: 0 };
-
-    cityCounters.set(city, index + 1);
 
     return [
       {
         key: getCompetitorKey(company),
         company,
-        lat: base.lat + offset.lat,
-        lon: base.lon + offset.lon,
+        lat,
+        lon,
       },
     ];
   });

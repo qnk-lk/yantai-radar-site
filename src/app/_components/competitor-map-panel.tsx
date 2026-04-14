@@ -43,6 +43,10 @@ function findAdminLocation(adminIndex: ChinaAdminIndex, cityName: string) {
   return null;
 }
 
+function hasCoordinates(company: CompetitorCompany) {
+  return Number.isFinite(Number(company.latitude)) && Number.isFinite(Number(company.longitude));
+}
+
 export function CompetitorMapPanel({
   baseline,
   adminIndex,
@@ -73,6 +77,10 @@ export function CompetitorMapPanel({
     () => (selectedCompany ? findAdminLocation(adminIndex, selectedCompany.city) : null),
     [adminIndex, selectedCompany]
   );
+  const hasVisibleMarkers = useMemo(
+    () => companies.some((company) => hasCoordinates(company)),
+    [companies]
+  );
 
   return (
     <div className="space-y-4 rounded-[1.7rem] border border-(--color-line) bg-white/82 p-5 shadow-[0_18px_50px_rgba(69,49,28,0.08)]">
@@ -86,7 +94,7 @@ export function CompetitorMapPanel({
       </div>
 
       <div className="relative overflow-hidden rounded-[1.8rem] border border-(--color-line)">
-        {!companies.length ? (
+        {!hasVisibleMarkers ? (
           <div className="pointer-events-none absolute left-4 top-4 z-500 rounded-full border border-white/70 bg-[rgba(255,250,241,0.94)] px-3 py-1 text-xs font-medium text-(--color-muted) shadow-[0_10px_24px_rgba(69,49,28,0.08)]">
             {t("map.no_coordinates")}
           </div>
@@ -108,7 +116,7 @@ export function CompetitorMapPanel({
                   ? `${formatAdminName(selectedLocation.provinceName, i18n.resolvedLanguage)} / ${formatAdminName(selectedLocation.cityName, i18n.resolvedLanguage)}`
                   : `${formatAdminName("中国", i18n.resolvedLanguage)} / ${formatAdminName(selectedCompany.city, i18n.resolvedLanguage)}`,
               })
-            : companies.length
+            : hasVisibleMarkers
               ? status
               : t("map.no_data")}
         </div>

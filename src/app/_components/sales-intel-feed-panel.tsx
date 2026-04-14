@@ -1,21 +1,73 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SalesIntelDetailModal } from "./sales-intel-detail-modal";
 import type { SalesIntelData, SalesIntelItem } from "./sales-intel-types";
 
+function sanitizeDisplayNote(value: string) {
+  return value
+    .replace(/已从 OpenClaw 最新日报自动同步，来源文件：[^。]*?\.jsonl/gu, "")
+    .replace(
+      /该数据由招聘平台统一调度器顺序执行生成；每日随机抽取平台，并在达到总线索阈值后停止/gu,
+      ""
+    )
+    .replace(/^[，。；\s]+|[，。；\s]+$/gu, "");
+}
+
+function formatDisplayUpdatedAt(value: string) {
+  return value.replace(/\s*CST$/u, "");
+}
+
+function normalizePublishedAtCandidate(value: string) {
+  return value.replace(/^更新于\s*/u, "").replace(/\s*CST$/u, "").trim();
+}
+
+function isDisplayPublishedAt(value: string) {
+  if (!value) {
+    return false;
+  }
+
+  return (
+    /^\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}(?::\d{2})?)?$/u.test(value) ||
+    /^(?:今天|昨天|\d{1,2}月\d{1,2}日|\d+分钟前|\d+小时前|\d+天前)$/u.test(value)
+  );
+}
+
+function getDisplayPublishedAt(item: SalesIntelItem) {
+  const candidates = [
+    item.publishedAt,
+    ...item.matchedJobs.map((job) => job.publishedAt),
+  ]
+    .map((value) => normalizePublishedAtCandidate(value))
+    .filter(Boolean);
+
+  return candidates.find((value) => isDisplayPublishedAt(value)) || "";
+}
+
+function getDisplayRetrievedAt(
+  retrievedAt?: string | null,
+  fallbackRetrievedAt?: string | null
+) {
+  const value = retrievedAt || fallbackRetrievedAt || "";
+  return value ? formatDisplayUpdatedAt(value) : "";
+}
+
 function FeedRow({
   item,
+  fallbackRetrievedAt,
   serialNumber,
   onView,
 }: {
   item: SalesIntelItem;
+  fallbackRetrievedAt?: string;
   serialNumber: number;
   onView: (item: SalesIntelItem) => void;
 }) {
   const { t } = useTranslation();
+  const displayPublishedAt = getDisplayPublishedAt(item);
+  const displayRetrievedAt = getDisplayRetrievedAt(item.retrievedAt, fallbackRetrievedAt);
 
   return (
     <article className="rounded-[1.5rem] border border-(--color-line) bg-(--color-card) px-5 py-5 shadow-[0_16px_40px_rgba(69,49,28,0.08)]">
@@ -33,22 +85,24 @@ function FeedRow({
                 {item.sourceLabel}
               </span>
             ) : null}
-            {item.publishedAt ? (
-              <span className="rounded-full border border-(--color-line) px-3 py-1 text-xs text-(--color-muted)">
-                {item.publishedAt}
-              </span>
-            ) : null}
           </div>
 
           <div className="space-y-2">
-            <h4 className="text-lg font-semibold leading-7 text-(--color-ink)">{item.title}</h4>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h4 className="text-lg font-semibold leading-7 text-(--color-ink)">{item.title}</h4>
+              {displayPublishedAt ? (
+                <span className="text-sm leading-7 text-(--color-muted)">
+                  {t("entry.published_at")} {displayPublishedAt}
+                </span>
+              ) : null}
+            </div>
             {item.subtitle ? (
               <p className="text-sm leading-7 text-(--color-muted)">{item.subtitle}</p>
             ) : null}
             <p className="text-sm leading-7 text-(--color-ink)/80">{item.summary}</p>
           </div>
 
-          {item.tags.length ? (
+          {item.tags.length || displayRetrievedAt ? (
             <div className="flex flex-wrap gap-2">
               {item.tags.map((tag) => (
                 <span
@@ -58,6 +112,11 @@ function FeedRow({
                   {tag}
                 </span>
               ))}
+              {displayRetrievedAt ? (
+                <span className="rounded-full bg-(--color-card-soft) px-3 py-1 text-xs font-medium text-(--color-ink)">
+                  {t("entry.retrieved_at")} {displayRetrievedAt}
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -74,30 +133,15 @@ function FeedRow({
   );
 }
 
-export function SalesIntelFeedPanel({
-  data,
-}: {
-  data: SalesIntelData;
-}) {
+export function SalesIntelFeedPanel({ data }: { data: SalesIntelData }) {
   const { t } = useTranslation();
   const [activeItem, setActiveItem] = useState<SalesIntelItem | null>(null);
   const [isPointerInside, setIsPointerInside] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const loopBoundaryRef = useRef<HTMLDivElement | null>(null);
+  const scrollPositionRef = useRef(0);
   const feedItems = data.feed;
-
-  const sourceSummary = useMemo(
-    () =>
-      data.sourceBreakdown
-        .filter((item) => item.count > 0)
-        .map((item) =>
-          t(`sales_intel.source_kinds.${item.kind}`, {
-            count: item.count,
-            updatedAt: item.updatedAt || t("sales_intel.not_synced"),
-          })
-        ),
-    [data.sourceBreakdown, t]
-  );
+  const displayNote = sanitizeDisplayNote(data.summary.note || "");
 
   const scrollingItems =
     feedItems.length > 1
@@ -113,6 +157,8 @@ export function SalesIntelFeedPanel({
     if (!container || feedItems.length <= 1) {
       return;
     }
+
+    scrollPositionRef.current = container.scrollTop;
 
     let animationFrameId = 0;
     let lastTimestamp = 0;
@@ -130,11 +176,14 @@ export function SalesIntelFeedPanel({
         const loopBoundary =
           loopBoundaryRef.current?.offsetTop ?? Math.max(currentContainer.scrollHeight / 2, 1);
 
-        currentContainer.scrollTop += elapsed * 0.03;
+        let nextScrollTop = scrollPositionRef.current + elapsed * 0.036;
 
-        if (currentContainer.scrollTop >= loopBoundary) {
-          currentContainer.scrollTop -= loopBoundary;
+        if (nextScrollTop >= loopBoundary) {
+          nextScrollTop -= loopBoundary;
         }
+
+        scrollPositionRef.current = nextScrollTop;
+        currentContainer.scrollTop = nextScrollTop;
       }
 
       lastTimestamp = timestamp;
@@ -156,41 +205,40 @@ export function SalesIntelFeedPanel({
               {t("sales_intel.feed_eyebrow")}
             </p>
             <div className="space-y-2">
-              <h2 className="text-2xl font-semibold tracking-tight text-(--color-ink) sm:text-3xl">
-                {t("sales_intel.feed_title")}
-              </h2>
-              <p className="max-w-3xl text-sm leading-7 text-(--color-muted) sm:text-base">
-                {data.summary.note || t("sales_intel.no_data")}
-              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <h2 className="text-2xl font-semibold tracking-tight text-(--color-ink) sm:text-3xl">
+                  {t("sales_intel.feed_title")}
+                </h2>
+                {data.updatedAt ? (
+                  <span className="text-2xl font-semibold tracking-tight text-(--color-muted) sm:text-3xl">
+                    {formatDisplayUpdatedAt(data.updatedAt)}
+                  </span>
+                ) : null}
+              </div>
+              {displayNote ? (
+                <p className="max-w-3xl text-sm leading-7 text-(--color-muted) sm:text-base">
+                  {displayNote}
+                </p>
+              ) : null}
             </div>
           </div>
 
-          <div className="rounded-[1.5rem] border border-(--color-line) bg-[linear-gradient(135deg,rgba(255,250,241,0.96),rgba(243,233,217,0.9))] px-5 py-4">
+          <div className="flex items-center gap-3 rounded-[1.5rem] border border-(--color-line) bg-[linear-gradient(135deg,rgba(255,250,241,0.96),rgba(243,233,217,0.9))] px-5 py-4 whitespace-nowrap">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-(--color-muted)">
               {t("sales_intel.total_label")}
             </p>
-            <p className="mt-2 text-3xl font-semibold leading-none text-(--color-ink)">
+            <p className="text-3xl font-semibold leading-none text-(--color-ink)">
               {data.totals.overall}
             </p>
           </div>
         </div>
 
-        {sourceSummary.length ? (
-          <div className="flex flex-wrap gap-3">
-            {sourceSummary.map((item) => (
-              <div
-                key={item}
-                className="rounded-full border border-(--color-line) bg-(--color-card-soft) px-4 py-2 text-sm text-(--color-muted)"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-        ) : null}
-
         {feedItems.length ? (
           <div
             ref={containerRef}
+            onScroll={(event) => {
+              scrollPositionRef.current = event.currentTarget.scrollTop;
+            }}
             onMouseEnter={() => setIsPointerInside(true)}
             onMouseLeave={() => setIsPointerInside(false)}
             className="scrollbar-hidden h-[34rem] overflow-y-auto overscroll-y-contain pr-4 -mr-4"
@@ -201,7 +249,12 @@ export function SalesIntelFeedPanel({
                   key={`${item.id}-${loop}-${index}`}
                   ref={loop === 1 && index === 0 ? loopBoundaryRef : null}
                 >
-                  <FeedRow item={item} serialNumber={index + 1} onView={setActiveItem} />
+                  <FeedRow
+                    item={item}
+                    fallbackRetrievedAt={data.updatedAt}
+                    serialNumber={index + 1}
+                    onView={setActiveItem}
+                  />
                 </div>
               ))}
             </div>

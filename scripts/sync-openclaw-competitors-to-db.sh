@@ -11,6 +11,9 @@ TEMP_DIR="${TEMP_DIR:-/tmp/yantai-radar-openclaw}"
 TEMP_JSON="$TEMP_DIR/competitors.from-openclaw.json"
 STATE_DIR="${STATE_DIR:-$TEMP_DIR/state}"
 STAMP_FILE="$STATE_DIR/competitors-input.stamp"
+GEOCODE_CACHE_FILE="${GEOCODE_CACHE_FILE:-$STATE_DIR/competitor-geocode-cache.json}"
+COMPETITOR_GEOCODER_PROVIDER="${COMPETITOR_GEOCODER_PROVIDER:-amap}"
+COMPETITOR_GEOCODER_ENV_FILE="${COMPETITOR_GEOCODER_ENV_FILE:-/home/ubuntu/yantai-radar-site/secrets/competitor-geocode.env}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CRON_RUNS_FILE=""
@@ -22,6 +25,13 @@ INPUT_SIZE=""
 INPUT_MTIME_MS=""
 INPUT_STAMP=""
 USE_INPUT_PATH="false"
+
+if [[ -f "$COMPETITOR_GEOCODER_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$COMPETITOR_GEOCODER_ENV_FILE"
+  set +a
+fi
 
 if [[ -f "$INPUT_PATH" ]]; then
   if [[ ! -s "$INPUT_PATH" ]]; then
@@ -130,6 +140,12 @@ else
     --output "$TEMP_JSON" \
     --allowed-cities "$ALLOWED_CITIES"
 fi
+
+node "$SCRIPT_DIR/enrich-competitors-with-geocodes.mjs" \
+  --input "$TEMP_JSON" \
+  --output "$TEMP_JSON" \
+  --cache "$GEOCODE_CACHE_FILE" \
+  --provider "$COMPETITOR_GEOCODER_PROVIDER"
 
 cp "$TEMP_JSON" "$OUTPUT_PATH"
 

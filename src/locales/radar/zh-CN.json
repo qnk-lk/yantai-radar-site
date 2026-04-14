@@ -81,8 +81,9 @@
     "feed_eyebrow": "销售总表",
     "feed_title": "所有相关销售及有用信息",
     "today_eyebrow": "当日十条",
-    "today_title": "今日招聘聚合十条重点信息",
-    "today_description": "展示每日随机平台聚合后保留下来的十条重点信息，当前更新时间为 {{updatedAt}}。",
+    "today_title": "今日聚合十条重点信息",
+    "today_description": "展示每日随机聚合后保留下来的十条重点信息，当前更新时间为 {{updatedAt}}。",
+    "today_search_items": "检索项：{{value}}",
     "today_count": "今日数量",
     "total_label": "总数",
     "last_updated": "统一更新时间：{{value}}",
@@ -124,7 +125,17 @@
   },
   "entry": {
     "source": "来源",
-    "published_at": "发布时间"
+    "published_at": "发布时间",
+    "retrieved_at": "检索时间"
+  },
+  "fallback": {
+    "competitor": {
+      "updated_at": "等待 OpenClaw 调研结果",
+      "status": "同行地图模块已就绪，等待首次 OpenClaw 产出同行数据。",
+      "note": "后续将按所选城市展示服务制造业客户的同行公司。",
+      "baseline_company_name": "烟台利道科技有限公司",
+      "baseline_service_scope_summary": "将以该公司公开服务边界作为对标基准，只筛选与制造业数字化交付相关的同行。"
+    }
   },
   "empty": {
     "priority": "今天还没有同步到足够强的高优先级线索，等待自动化任务写入 latest.json。",

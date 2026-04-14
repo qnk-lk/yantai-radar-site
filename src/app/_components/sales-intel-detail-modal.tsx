@@ -62,7 +62,7 @@ export function SalesIntelDetailModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-(--color-line) bg-[linear-gradient(180deg,rgba(255,251,244,0.98),rgba(246,237,224,0.98))] p-6 shadow-[0_30px_90px_rgba(52,38,24,0.24)] sm:p-8"
+        className="scrollbar-hidden max-h-[92vh] w-full max-w-4xl overflow-y-auto overscroll-y-contain rounded-[2rem] border border-(--color-line) bg-[linear-gradient(180deg,rgba(255,251,244,0.98),rgba(246,237,224,0.98))] p-6 shadow-[0_30px_90px_rgba(52,38,24,0.24)] sm:p-8"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">

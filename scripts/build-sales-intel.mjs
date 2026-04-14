@@ -31,6 +31,16 @@ function sanitizeText(value, maxLength = 320) {
   return compactText(value).slice(0, maxLength);
 }
 
+function sanitizePublicNote(value) {
+  return compactText(value)
+    .replace(/已从 OpenClaw 最新日报自动同步，来源文件：[^。]*?\.jsonl/gu, "")
+    .replace(
+      /该数据由招聘平台统一调度器顺序执行生成；每日随机抽取平台，并在达到总线索阈值后停止/gu,
+      ""
+    )
+    .replace(/^[，。；\s]+|[，。；\s]+$/gu, "");
+}
+
 function createId(prefix, ...parts) {
   return createHash("sha1")
     .update([prefix, ...parts.map((part) => compactText(part))].join("::"), "utf8")
@@ -61,6 +71,25 @@ function createDetailRows(pairs) {
       value: sanitizeText(value, 600),
     }))
     .filter((item) => item.value);
+}
+
+function compareTimestampDesc(left, right) {
+  const leftKey = getSortKey(left);
+  const rightKey = getSortKey(right);
+
+  if (leftKey && rightKey) {
+    return rightKey.localeCompare(leftKey);
+  }
+
+  if (rightKey) {
+    return 1;
+  }
+
+  if (leftKey) {
+    return -1;
+  }
+
+  return 0;
 }
 
 async function readJsonSafe(filePath, fallback) {
@@ -97,6 +126,7 @@ function transformRadarEntry(category, entry, fallbackUpdatedAt, index) {
   return {
     id: createId("report", category, title, entry?.publishedAt || "", index),
     kind: "report",
+    retrievedAt: sanitizeText(fallbackUpdatedAt, 40),
     category,
     title,
     subtitle: sanitizeText(subtitle, 160),
@@ -110,6 +140,7 @@ function transformRadarEntry(category, entry, fallbackUpdatedAt, index) {
     tags,
     detailRows: createDetailRows([
       ["分类", category],
+      ["检索时间", fallbackUpdatedAt],
       ["来源", entry?.source],
       ["时间", entry?.publishedAt || fallbackUpdatedAt],
       ["地区", entry?.location],
@@ -131,6 +162,7 @@ function transformRadarAction(action, fallbackUpdatedAt, index) {
   return {
     id: createId("action", title, fallbackUpdatedAt, index),
     kind: "report",
+    retrievedAt: sanitizeText(fallbackUpdatedAt, 40),
     category: "跟进行动",
     title,
     subtitle: sanitizeText(fallbackUpdatedAt, 40),
@@ -144,6 +176,7 @@ function transformRadarAction(action, fallbackUpdatedAt, index) {
     tags: ["待执行"],
     detailRows: createDetailRows([
       ["分类", "跟进行动"],
+      ["检索时间", fallbackUpdatedAt],
       ["来源", "OpenClaw 日报"],
       ["同步时间", fallbackUpdatedAt],
       ["执行建议", title],
@@ -157,7 +190,7 @@ function latestJobPublishedAt(matchedJobs) {
   return pickNewestTimestamp(...(matchedJobs || []).map((job) => job?.publishedAt));
 }
 
-function transformRecruitmentLead(lead, index) {
+function transformRecruitmentLead(lead, fallbackUpdatedAt, index) {
   const sourcePlatforms = Array.isArray(lead?.sourcePlatforms)
     ? lead.sourcePlatforms.filter(Boolean)
     : [];
@@ -179,6 +212,7 @@ function transformRecruitmentLead(lead, index) {
   return {
     id: createId("recruitment", lead?.companyName, lead?.city, lead?.rank || index),
     kind: "recruitment",
+    retrievedAt: sanitizeText(lead?.retrievedAt || fallbackUpdatedAt, 40),
     category: "招聘信号",
     title: sanitizeText(lead?.companyName || `招聘线索 ${index + 1}`, 120),
     subtitle: sanitizeText(
@@ -202,6 +236,7 @@ function transformRecruitmentLead(lead, index) {
       .slice(0, 6),
     detailRows: createDetailRows([
       ["分类", lead?.companyCategory],
+      ["检索时间", lead?.retrievedAt || fallbackUpdatedAt],
       ["线索类型", lead?.leadType],
       ["强度", lead?.leadStrength],
       ["城市", lead?.city],
@@ -249,7 +284,58 @@ function buildReportItems(radarPayload) {
 
 function buildRecruitmentItems(recruitmentPayload) {
   const leads = Array.isArray(recruitmentPayload?.leads) ? recruitmentPayload.leads : [];
-  return leads.map((lead, index) => transformRecruitmentLead(lead, index));
+  const updatedAt = sanitizeText(recruitmentPayload?.updatedAt);
+  return leads.map((lead, index) => transformRecruitmentLead(lead, updatedAt, index));
+}
+
+function sortSalesIntelItems(items) {
+  return [...items].sort((left, right) => {
+    const retrievedAtOrder = compareTimestampDesc(left.retrievedAt, right.retrievedAt);
+    if (retrievedAtOrder !== 0) {
+      return retrievedAtOrder;
+    }
+
+    const publishedAtOrder = compareTimestampDesc(left.publishedAt, right.publishedAt);
+    if (publishedAtOrder !== 0) {
+      return publishedAtOrder;
+    }
+
+    return left.title.localeCompare(right.title, "zh-CN");
+  });
+}
+
+function uniqueStrings(items) {
+  return [...new Set(items.filter(Boolean))];
+}
+
+function extractTodaySearchItems(recruitmentPayload, recruitmentItems) {
+  const strategyItems = Array.isArray(recruitmentPayload?.strategy?.selectedPlatforms)
+    ? recruitmentPayload.strategy.selectedPlatforms.map((item) => sanitizeText(item, 40))
+    : [];
+
+  if (strategyItems.length) {
+    return uniqueStrings(strategyItems).slice(0, 3);
+  }
+
+  const coverageItems = Array.isArray(recruitmentPayload?.platformCoverage)
+    ? recruitmentPayload.platformCoverage
+        .map((item) => sanitizeText(item?.platform || item?.name || item?.label, 40))
+        .filter(Boolean)
+    : [];
+
+  if (coverageItems.length) {
+    return uniqueStrings(coverageItems).slice(0, 3);
+  }
+
+  return uniqueStrings(
+    recruitmentItems.flatMap((item) => [
+      ...String(item.sourceLabel || "")
+        .split(/[、,，]/u)
+        .map((value) => sanitizeText(value, 40))
+        .filter(Boolean),
+      ...item.matchedJobs.map((job) => sanitizeText(job?.platform, 40)).filter(Boolean),
+    ])
+  ).slice(0, 3);
 }
 
 function buildSummary(radarPayload, recruitmentPayload, reportCount, recruitmentCount) {
@@ -261,8 +347,8 @@ function buildSummary(radarPayload, recruitmentPayload, reportCount, recruitment
     sanitizeText(recruitmentPayload?.status, 180),
   ].filter(Boolean);
   const noteParts = [
-    sanitizeText(radarPayload?.summary?.note, 220),
-    sanitizeText(recruitmentPayload?.note, 220),
+    sanitizePublicNote(sanitizeText(radarPayload?.summary?.note, 220)),
+    sanitizePublicNote(sanitizeText(recruitmentPayload?.note, 220)),
   ].filter(Boolean);
 
   return {
@@ -291,7 +377,7 @@ async function main() {
   const radarPayload = await readJsonSafe(radarPath, {});
   const recruitmentPayload = await readJsonSafe(recruitmentPath, {});
   const reportItems = buildReportItems(radarPayload);
-  const recruitmentItems = buildRecruitmentItems(recruitmentPayload);
+  const recruitmentItems = sortSalesIntelItems(buildRecruitmentItems(recruitmentPayload));
   const todayHighlights = recruitmentItems.slice(0, 10);
   const updatedAt =
     pickNewestTimestamp(radarPayload?.updatedAt, recruitmentPayload?.updatedAt) ||
@@ -299,6 +385,7 @@ async function main() {
 
   const payload = {
     updatedAt,
+    todaySearchItems: extractTodaySearchItems(recruitmentPayload, todayHighlights),
     summary: buildSummary(
       radarPayload,
       recruitmentPayload,
@@ -323,7 +410,7 @@ async function main() {
         updatedAt: sanitizeText(recruitmentPayload?.updatedAt),
       },
     ],
-    feed: [...reportItems, ...recruitmentItems],
+    feed: sortSalesIntelItems([...reportItems, ...recruitmentItems]),
     todayHighlights,
   };
 

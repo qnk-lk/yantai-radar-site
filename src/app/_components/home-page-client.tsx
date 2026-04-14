@@ -14,42 +14,46 @@ import { SalesIntelTodayPanel } from "./sales-intel-today-panel";
 import type { SalesIntelData } from "./sales-intel-types";
 import { getCompetitorKey, type ChinaAdminIndex, type CompetitorData } from "./competitor-types";
 
-const fallbackSalesIntelData: SalesIntelData = {
-  updatedAt: "",
-  summary: {
-    focus: "",
-    status: "",
-    note: "",
-  },
-  totals: {
-    overall: 0,
-    reportItems: 0,
-    recruitmentItems: 0,
-    todayHighlights: 0,
-  },
-  sourceBreakdown: [
-    { kind: "report", count: 0, updatedAt: "" },
-    { kind: "recruitment", count: 0, updatedAt: "" },
-  ],
-  feed: [],
-  todayHighlights: [],
-};
-
-const fallbackCompetitorData: CompetitorData = {
-  updatedAt: "等待 OpenClaw 调研结果",
-  status: "同行地图模块已就绪，等待首次 OpenClaw 产出同行数据。",
-  note: "后续将按所选城市展示服务制造业客户的同行公司。",
-  baseline: {
-    companyName: "烟台利道科技有限公司",
-    serviceScopeSummary:
-      "将以该公司公开服务边界作为对标基准，只筛选与制造业数字化交付相关的同行。",
-    evidence: [],
-  },
-  competitors: [],
-};
-
 const fallbackAdminIndex: ChinaAdminIndex = {};
 const publicApiBaseUrl = process.env.NEXT_PUBLIC_RADAR_API_BASE_URL?.replace(/\/$/, "") ?? "";
+
+function createFallbackSalesIntelData(): SalesIntelData {
+  return {
+    updatedAt: "",
+    todaySearchItems: [],
+    summary: {
+      focus: "",
+      status: "",
+      note: "",
+    },
+    totals: {
+      overall: 0,
+      reportItems: 0,
+      recruitmentItems: 0,
+      todayHighlights: 0,
+    },
+    sourceBreakdown: [
+      { kind: "report", count: 0, updatedAt: "" },
+      { kind: "recruitment", count: 0, updatedAt: "" },
+    ],
+    feed: [],
+    todayHighlights: [],
+  };
+}
+
+function createFallbackCompetitorData(t: (key: string) => string): CompetitorData {
+  return {
+    updatedAt: t("fallback.competitor.updated_at"),
+    status: t("fallback.competitor.status"),
+    note: t("fallback.competitor.note"),
+    baseline: {
+      companyName: t("fallback.competitor.baseline_company_name"),
+      serviceScopeSummary: t("fallback.competitor.baseline_service_scope_summary"),
+      evidence: [],
+    },
+    competitors: [],
+  };
+}
 
 function withApiBase(path: string) {
   return publicApiBaseUrl ? `${publicApiBaseUrl}${path}` : path;
@@ -109,6 +113,8 @@ function MetricCard({ label, value, detail }: { label: string; value: string; de
 
 export default function Home() {
   const { t } = useTranslation();
+  const fallbackSalesIntelData = useMemo(() => createFallbackSalesIntelData(), []);
+  const fallbackCompetitorData = useMemo(() => createFallbackCompetitorData(t), [t]);
   const [salesIntelData, setSalesIntelData] = useState<SalesIntelData>(fallbackSalesIntelData);
   const [competitorData, setCompetitorData] = useState<CompetitorData>(fallbackCompetitorData);
   const [adminIndex, setAdminIndex] = useState<ChinaAdminIndex>(fallbackAdminIndex);
@@ -173,7 +179,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [fallbackCompetitorData, fallbackSalesIntelData]);
 
   const visibleCompetitors = useMemo(() => {
     if (!selectedCities.length) {
@@ -254,14 +260,14 @@ export default function Home() {
     <main className="min-h-screen bg-(--color-bg) text-(--color-ink)">
       <div className="absolute inset-x-0 top-0 -z-10 h-136 bg-[radial-gradient(circle_at_top_left,rgba(182,107,58,0.24),transparent_48%),radial-gradient(circle_at_75%_18%,rgba(53,97,108,0.18),transparent_42%)]" />
 
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 py-10 sm:px-8 lg:px-10">
+      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-10 px-4 py-10 sm:px-6 lg:px-8 xl:px-10">
         <section className="overflow-visible rounded-4xl border border-(--color-line) bg-[linear-gradient(135deg,rgba(255,251,244,0.92),rgba(245,235,221,0.92))] p-6 shadow-[0_25px_70px_rgba(69,49,28,0.12)] sm:p-8 lg:p-10">
           <div className="mb-8 grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:gap-6">
             <LocationWeatherClock />
             <LanguageSwitcher />
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-3 rounded-full border border-(--color-line) bg-white/80 px-4 py-2 text-xs font-medium uppercase tracking-[0.3em] text-(--color-accent)">
                 {t("chrome.badge")}
@@ -336,6 +342,7 @@ export default function Home() {
         <SalesIntelTodayPanel
           items={salesIntelData.todayHighlights}
           updatedAt={salesIntelData.updatedAt}
+          searchItems={salesIntelData.todaySearchItems}
         />
       </div>
     </main>

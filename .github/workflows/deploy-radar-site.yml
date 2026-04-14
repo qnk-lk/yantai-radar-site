@@ -63,7 +63,7 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
           rsync -avz -e "ssh -p ${SERVER_PORT:-22}" server/ "${SERVER_USER}@${SERVER_HOST}:/home/ubuntu/yantai-radar-site/server/"
-          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" scripts/build-sales-intel.mjs "${SERVER_USER}@${SERVER_HOST}:/home/ubuntu/yantai-radar-site/scripts/"
+          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" scripts/ "${SERVER_USER}@${SERVER_HOST}:/home/ubuntu/yantai-radar-site/scripts/"
 
       - name: Refresh server runtime
         env:

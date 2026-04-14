@@ -94,6 +94,15 @@ function normalizeStringList(value) {
     .filter(Boolean);
 }
 
+function normalizeOptionalNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
 function normalizeEvidenceItem(value) {
   return {
     source: normalizeText(value?.source),
@@ -106,7 +115,17 @@ function normalizeCompetitor(value, index) {
   return {
     rank: Number.isFinite(value?.rank) ? Number(value.rank) : index + 1,
     companyName: normalizeText(value?.companyName),
+    province: normalizeText(value?.province),
     city: normalizeText(value?.city),
+    district: normalizeText(value?.district),
+    location: normalizeText(value?.location),
+    address: normalizeText(value?.address),
+    poiName: normalizeText(value?.poiName),
+    latitude: normalizeOptionalNumber(value?.latitude),
+    longitude: normalizeOptionalNumber(value?.longitude),
+    geocodeSource: normalizeText(value?.geocodeSource),
+    geocodeConfidence: normalizeText(value?.geocodeConfidence),
+    geocodedAt: normalizeText(value?.geocodedAt),
     distanceTier: normalizeText(value?.distanceTier),
     serviceFit: normalizeText(value?.serviceFit),
     manufacturingFocus: normalizeText(value?.manufacturingFocus),
@@ -512,6 +531,7 @@ function buildCompetitorSnapshotDocument(db, payload) {
   }
 
   const competitors = masterRows.map((row, index) => ({
+    ...parseJsonText(row.latest_payload, {}),
     rank: index + 1,
     companyName: row.company_name,
     city: row.city,
@@ -565,7 +585,17 @@ function importCompetitorDocument(db, rawPayload, source) {
       } else {
         const previousComparable = {
           companyName: previous.company_name,
+          province: normalizeText(parseJsonText(previous.latest_payload, {})?.province),
           city: previous.city,
+          district: normalizeText(parseJsonText(previous.latest_payload, {})?.district),
+          location: normalizeText(parseJsonText(previous.latest_payload, {})?.location),
+          address: normalizeText(parseJsonText(previous.latest_payload, {})?.address),
+          poiName: normalizeText(parseJsonText(previous.latest_payload, {})?.poiName),
+          latitude: normalizeOptionalNumber(parseJsonText(previous.latest_payload, {})?.latitude),
+          longitude: normalizeOptionalNumber(parseJsonText(previous.latest_payload, {})?.longitude),
+          geocodeSource: normalizeText(parseJsonText(previous.latest_payload, {})?.geocodeSource),
+          geocodeConfidence: normalizeText(parseJsonText(previous.latest_payload, {})?.geocodeConfidence),
+          geocodedAt: normalizeText(parseJsonText(previous.latest_payload, {})?.geocodedAt),
           distanceTier: previous.distance_tier,
           serviceFit: previous.service_fit,
           manufacturingFocus: previous.manufacturing_focus,
@@ -576,7 +606,17 @@ function importCompetitorDocument(db, rawPayload, source) {
         };
 
         const fieldPairs = [
+          ["province", previousComparable.province, competitor.province],
           ["city", previousComparable.city, competitor.city],
+          ["district", previousComparable.district, competitor.district],
+          ["location", previousComparable.location, competitor.location],
+          ["address", previousComparable.address, competitor.address],
+          ["poiName", previousComparable.poiName, competitor.poiName],
+          ["latitude", previousComparable.latitude, competitor.latitude],
+          ["longitude", previousComparable.longitude, competitor.longitude],
+          ["geocodeSource", previousComparable.geocodeSource, competitor.geocodeSource],
+          ["geocodeConfidence", previousComparable.geocodeConfidence, competitor.geocodeConfidence],
+          ["geocodedAt", previousComparable.geocodedAt, competitor.geocodedAt],
           ["distanceTier", previousComparable.distanceTier, competitor.distanceTier],
           ["serviceFit", previousComparable.serviceFit, competitor.serviceFit],
           ["manufacturingFocus", previousComparable.manufacturingFocus, competitor.manufacturingFocus],
