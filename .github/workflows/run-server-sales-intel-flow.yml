@@ -1,0 +1,73 @@
+name: Run Server Sales Intel Flow
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - .github/workflows/run-server-sales-intel-flow.yml
+      - next.config.ts
+  workflow_dispatch:
+
+jobs:
+  run-flow:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SSH_KEY_B64: ${{ secrets.SERVER_SSH_KEY_B64 }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s' "$SERVER_SSH_KEY_B64" | base64 --decode > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${SERVER_PORT:-22}" "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Sync runtime files to server
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" server/ "${SERVER_USER}@${SERVER_HOST}:/home/ubuntu/yantai-radar-site/server/"
+          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" scripts/ "${SERVER_USER}@${SERVER_HOST}:/home/ubuntu/yantai-radar-site/scripts/"
+          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" \
+            public/competitors.json \
+            public/china-admin-divisions.json \
+            "${SERVER_USER}@${SERVER_HOST}:/var/www/qn-message.com/"
+
+      - name: Run server sales intel pipeline
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -p "${SERVER_PORT:-22}" "${SERVER_USER}@${SERVER_HOST}" <<'EOF'
+          set -euo pipefail
+          mkdir -p /home/ubuntu/yantai-radar-site/scripts /home/ubuntu/yantai-radar-site/server/data /home/ubuntu/openclaw-bridge
+          chmod +x /home/ubuntu/yantai-radar-site/scripts/*.sh || true
+
+          cd /home/ubuntu/yantai-radar-site/server
+          npm install --omit=dev
+
+          /home/ubuntu/yantai-radar-site/scripts/server-run-recruitment-platforms.sh
+          /home/ubuntu/yantai-radar-site/scripts/sync-openclaw-latest-to-site-and-db.sh
+
+          sudo systemctl restart radar-api.service
+
+          echo "=== sales-intel api ==="
+          curl -fsS http://127.0.0.1:3180/api/sales/intel
+          echo
+          echo "=== recruitment aggregate ==="
+          if [ -f /var/www/qn-message.com/recruitment-leads-aggregate.json ]; then
+            wc -c /var/www/qn-message.com/recruitment-leads-aggregate.json
+          else
+            echo "recruitment aggregate missing"
+          fi
+          EOF
