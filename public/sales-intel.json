@@ -1,0 +1,28 @@
+{
+  "updatedAt": "",
+  "summary": {
+    "focus": "",
+    "status": "",
+    "note": ""
+  },
+  "totals": {
+    "overall": 0,
+    "reportItems": 0,
+    "recruitmentItems": 0,
+    "todayHighlights": 0
+  },
+  "sourceBreakdown": [
+    {
+      "kind": "report",
+      "count": 0,
+      "updatedAt": ""
+    },
+    {
+      "kind": "recruitment",
+      "count": 0,
+      "updatedAt": ""
+    }
+  ],
+  "feed": [],
+  "todayHighlights": []
+}

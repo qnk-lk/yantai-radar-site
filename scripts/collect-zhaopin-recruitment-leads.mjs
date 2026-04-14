@@ -4,17 +4,17 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DEFAULT_DEBUG_URL = "http://127.0.0.1:9223";
+const DEFAULT_DEBUG_URL = "http://127.0.0.1:9224";
 const DEFAULT_CITIES = [
-  { name: "烟台", code: "101120500" },
-  { name: "青岛", code: "101120200" },
+  { name: "烟台", code: "707" },
+  { name: "青岛", code: "703" },
 ];
 const DEFAULT_KEYWORDS = ["MES", "WMS", "QMS", "智能制造"];
 const DEFAULT_MAX_COMPANIES = 10;
 const DEFAULT_MAX_JOBS_PER_QUERY = 15;
 const SEARCH_WAIT_MS = 5_500;
 const DETAIL_WAIT_MS = 3_500;
-const BOSS_BASE_URL = "https://www.zhipin.com";
+const ZHAOPIN_BASE_URL = "https://sou.zhaopin.com/";
 
 const KEYWORD_ALIASES = {
   MES: ["MES", "生产执行", "制造执行"],
@@ -33,26 +33,28 @@ const MANUFACTURING_COMPANY_PATTERN =
 const SERVICE_JOB_PATTERN = /实施|顾问|售前|项目经理|产品经理|交付|架构/i;
 const INTERNAL_DIGITAL_JOB_PATTERN = /运维|工程师|主管|专员|总监|经理|生产|质量|仓储/i;
 const BLOCKED_PATTERN =
-  /请稍候|安全验证|验证码|异常访问|请登录后继续|security-check|captcha|登录注册/i;
+  /安全验证|验证码|异常访问|访问受限|登录后可查看|请登录后查看|继续访问请登录|为保证您的正常访问/i;
+const CONTACT_SEGMENT_PATTERN =
+  /(?:[A-Za-z\u4e00-\u9fa5]{1,24}·(?:招聘专员|招聘主管|人事行政经理|人力资源经理|招聘经理|办公室主任|HRBP经理|HRBP|HR|hr|经理)|(?:今日回复\d+次|刚刚活跃|\d+小时内回复可能性大|高回复率|立即沟通|立即投递|收藏|举报|微信扫码分享|APP))/gi;
 const CONTACT_LINE_PATTERN =
-  /立即沟通|感兴趣|微信|扫码|手机号|手机|电话|邮箱|HR|hr|人事|招聘者|在线简历|附件简历|竞争力分析|个人综合排名|举报|防骗|热线|客服|BOSS 安全提示/i;
+  /立即沟通|立即投递|招聘专员|招聘主管|人力资源经理|人事行政经理|办公室主任|HRBP|HR|hr|高回复率|小时内回复|今日回复|刚刚活跃|微信扫码分享|举报|APP/i;
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(currentFilePath), "..");
 
 function printHelp() {
   console.log(`Usage:
-  pnpm boss:browser
-  pnpm boss:collect -- --output .tmp/boss-recruitment-leads.json --max-companies 10
+  pnpm zhaopin:browser
+  pnpm zhaopin:collect -- --output .tmp/zhaopin-recruitment-leads.json --max-companies 10
 
 Options:
   --debug-url <url>          Chrome remote debugging endpoint. Default: ${DEFAULT_DEBUG_URL}
-  --output <path>            Output JSON path. Default: .tmp/boss-recruitment-leads.json
+  --output <path>            Output JSON path. Default: .tmp/zhaopin-recruitment-leads.json
   --max-companies <number>   Unique company limit. Default: ${DEFAULT_MAX_COMPANIES}
   --keywords <list>          Comma-separated keywords. Default: ${DEFAULT_KEYWORDS.join(",")}
-  --cities <list>            Comma-separated cityName:bossCityCode. Default: 烟台:101120500,青岛:101120200
+  --cities <list>            Comma-separated cityName:zhaopinCityCode. Default: 烟台:707,青岛:703
   --max-jobs-per-query <n>   Search cards kept from each query. Default: ${DEFAULT_MAX_JOBS_PER_QUERY}
-  --session-file <path>      Optional BOSS cookie session JSON exported from a logged-in browser.
+  --session-file <path>      Optional Zhaopin cookie session JSON exported from a logged-in browser.
   --no-details               Do not open job detail pages; use search cards only.
 `);
 }
@@ -98,7 +100,7 @@ function parseCities(value) {
 
   const defaultCodeByName = new Map(DEFAULT_CITIES.map((city) => [city.name, city.code]));
   return value
-    .split(",")
+    .split(/[,;\s]+/)
     .map((item) => item.trim())
     .filter(Boolean)
     .map((item) => {
@@ -125,7 +127,8 @@ function parseArgs(argv) {
   return {
     debugUrl: readOption(argv, "debug-url") || DEFAULT_DEBUG_URL,
     output:
-      readOption(argv, "output") || path.join(projectRoot, ".tmp", "boss-recruitment-leads.json"),
+      readOption(argv, "output") ||
+      path.join(projectRoot, ".tmp", "zhaopin-recruitment-leads.json"),
     sessionFile: readOption(argv, "session-file"),
     maxCompanies: Math.max(
       1,
@@ -147,8 +150,15 @@ function compactText(value) {
     .trim();
 }
 
+function removeContactSegments(value) {
+  return String(value || "")
+    .replace(CONTACT_SEGMENT_PATTERN, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function sanitizeText(value, maxLength = 260) {
-  const lines = String(value || "")
+  const lines = removeContactSegments(value)
     .split(/\r?\n| {2,}/)
     .map((line) => compactText(line))
     .filter(Boolean)
@@ -189,9 +199,9 @@ function getShanghaiUpdatedAt() {
 }
 
 function buildSearchUrl(city, keyword) {
-  const url = new URL("/web/geek/jobs", BOSS_BASE_URL);
-  url.searchParams.set("query", keyword);
-  url.searchParams.set("city", city.code);
+  const url = new URL(ZHAOPIN_BASE_URL);
+  url.searchParams.set("jl", city.code);
+  url.searchParams.set("kw", keyword);
   return url.toString();
 }
 
@@ -315,7 +325,10 @@ function buildLeadStrength(keywordHits, jobTitle, description) {
 function createLeadFromJob(job, detail, rank, keywordSet) {
   const jobTitle = sanitizeText(detail?.jobTitle || job.jobTitle, 80);
   const description = sanitizeText(detail?.jobDescription || "", 360);
-  const companyIntro = sanitizeText(detail?.companyIntro || "", 360);
+  const companyIntro = sanitizeText(
+    `${detail?.companyMeta || ""} ${detail?.companyBusiness || ""}`,
+    360
+  );
   const address = sanitizeText(detail?.address || "", 120);
   const salary = sanitizeText(detail?.salary || job.salary || "", 50);
   const evidenceText = `${jobTitle} ${job.cardText} ${description} ${companyIntro} ${job.queryKeyword}`;
@@ -326,7 +339,7 @@ function createLeadFromJob(job, detail, rank, keywordSet) {
     salary ? `薪资：${salary}` : "",
     address ? `地址：${address}` : "",
     description ? `岗位依据：${description}` : "",
-    companyIntro ? `公司介绍：${companyIntro}` : "",
+    companyIntro ? `公司信息：${companyIntro}` : "",
   ].filter(Boolean);
 
   return {
@@ -336,16 +349,16 @@ function createLeadFromJob(job, detail, rank, keywordSet) {
     companyCategory: classification.companyCategory,
     leadType: classification.leadType,
     leadStrength: buildLeadStrength(keywordHits, jobTitle, description),
-    signalSummary: `BOSS直聘出现“${jobTitle}”岗位，命中 ${keywordHits.length ? keywordHits.join("、") : job.queryKeyword} 等制造业数字化信号。`,
+    signalSummary: `智联招聘出现“${jobTitle}”岗位，命中 ${keywordHits.length ? keywordHits.join("、") : job.queryKeyword} 等制造业数字化信号。`,
     inferredNeed: classification.inferredNeed,
     matchedKeywords: keywordHits.length ? keywordHits : [job.queryKeyword],
     matchedJobs: [
       {
-        platform: "BOSS直聘",
+        platform: "智联招聘",
         jobTitle,
         city: job.city,
         salary,
-        publishedAt: "",
+        publishedAt: sanitizeText(detail?.updatedAt || "", 40),
         url: job.jobUrl,
         keywordHits: keywordHits.length ? keywordHits : [job.queryKeyword],
         descriptionEvidence: description || sanitizeText(job.cardText, 220),
@@ -353,14 +366,14 @@ function createLeadFromJob(job, detail, rank, keywordSet) {
     ],
     evidence: [
       {
-        source: "BOSS直聘职位页",
+        source: "智联招聘职位页",
         url: job.jobUrl,
         note: sanitizeText(evidenceNoteParts.join("；"), 520),
       },
     ],
     recommendedAction:
       "先核验公司官网、业务范围和近期招聘连续性，再按潜在客户或同行合作对象分层跟进。",
-    riskNotes: "仅基于公开招聘页面反推业务信号；已过滤个人联系方式。",
+    riskNotes: "仅基于公开招聘页面反推业务信号；已过滤招聘联系人等个人信息。",
   };
 }
 
@@ -374,11 +387,11 @@ function mergeLead(lead, job, detail, keywordSet) {
 
   if (!urlExists) {
     lead.matchedJobs.push({
-      platform: "BOSS直聘",
+      platform: "智联招聘",
       jobTitle,
       city: job.city,
       salary: sanitizeText(detail?.salary || job.salary || "", 50),
-      publishedAt: "",
+      publishedAt: sanitizeText(detail?.updatedAt || "", 40),
       url: job.jobUrl,
       keywordHits: keywordHits.length ? keywordHits : [job.queryKeyword],
       descriptionEvidence: description || sanitizeText(job.cardText, 220),
@@ -396,24 +409,24 @@ function buildPayload({ leads, cities, keywords, maxCompanies, platformStatus, q
   return {
     updatedAt: getShanghaiUpdatedAt(),
     status: `已同步 ${effectiveCompanyCount} 家招聘信号反推线索公司。`,
-    note: "该数据由本地真实 Chrome 登录态抓取 BOSS 公开招聘页面生成，独立于日报和同行地图；不采集个人联系方式。",
+    note: "该数据由浏览器登录态抓取智联招聘公开职位页面生成，独立于日报和同行地图；不采集个人联系方式。",
     strategy: {
       cities: cities.map((city) => city.name),
       targetCompanyLimit: maxCompanies,
-      primaryPlatforms: ["BOSS直聘", "智联招聘"],
+      primaryPlatforms: ["智联招聘", "BOSS直聘"],
       fallbackPlatforms: ["前程无忧", "猎聘", "齐鲁人才网"],
       keywords,
     },
     platformCoverage: [
       {
-        platform: "BOSS直聘",
+        platform: "智联招聘",
         status: platformStatus,
         querySummary: queryLogs.join("；"),
         effectiveCompanyCount,
         note:
           platformStatus === "ok"
-            ? "通过本机已登录真实 Chrome 读取公开岗位和职位详情。"
-            : "BOSS 页面可能出现登录、验证码或安全校验，需要重新登录后再运行。",
+            ? "通过浏览器职位搜索页与详情页提取结构化招聘线索。"
+            : "智联页面可能出现登录、验证码或访问限制，需要刷新登录态后再运行。",
       },
     ],
     leads,
@@ -561,7 +574,10 @@ class CdpClient {
   async loadCookies(cookies) {
     const filteredCookies = Array.isArray(cookies)
       ? cookies
-          .filter((cookie) => cookie && typeof cookie.name === "string" && typeof cookie.value === "string")
+          .filter(
+            (cookie) =>
+              cookie && typeof cookie.name === "string" && typeof cookie.value === "string"
+          )
           .map((cookie) => {
             const value = {
               name: cookie.name,
@@ -576,7 +592,11 @@ class CdpClient {
               value.sameSite = cookie.sameSite;
             }
 
-            if (typeof cookie.expires === "number" && Number.isFinite(cookie.expires) && cookie.expires > 0) {
+            if (
+              typeof cookie.expires === "number" &&
+              Number.isFinite(cookie.expires) &&
+              cookie.expires > 0
+            ) {
               value.expires = cookie.expires;
             }
 
@@ -609,13 +629,23 @@ class CdpClient {
 function searchExtractionExpression(maxJobsPerQuery) {
   return String.raw`(() => {
     const compact = (text) => (text || "").replace(/\s+/g, " ").trim();
-    const anchors = Array.from(document.querySelectorAll('a[href*="/job_detail/"]'));
+    const normalizeJobUrl = (value) => {
+      try {
+        const url = new URL(value, location.href);
+        return url.origin + url.pathname;
+      } catch {
+        return String(value || "").split("?")[0];
+      }
+    };
     const cards = [];
     const seen = new Set();
+    const anchors = Array.from(document.querySelectorAll('a.jobinfo__name[href*="/jobdetail/"], a[href*="/jobdetail/"]'));
 
     for (const anchor of anchors) {
-      const card = anchor.closest(".job-card-box, .job-card-wrap, li") || anchor.parentElement;
-      const companyAnchor = card?.querySelector('a[href*="/gongsi/"], a[href*="/company"]');
+      const card = anchor.closest(".joblist-box__item, .joblist-box__iteminfo, li, article, .positionlist__list-item");
+      const companyAnchor =
+        card?.querySelector('a.companyinfo__name[href*="/companydetail/"], a[href*="/companydetail/"]') ||
+        card?.querySelector('a[href*="/companydetail/"]');
       const jobUrl = anchor.href;
       const jobTitle = compact(anchor.innerText || anchor.textContent);
       const companyName = compact(companyAnchor?.innerText || companyAnchor?.textContent);
@@ -627,11 +657,16 @@ function searchExtractionExpression(maxJobsPerQuery) {
       seen.add(jobUrl);
       cards.push({
         jobTitle,
-        jobUrl,
+        jobUrl: normalizeJobUrl(jobUrl),
         companyName,
         companyUrl: companyAnchor?.href || "",
-        salary: compact(card?.querySelector(".salary")?.innerText || ""),
-        cardText: compact(card?.innerText || card?.textContent || "").slice(0, 360),
+        salary: compact(card?.querySelector(".jobinfo__salary, .summary-planes__salary")?.innerText || ""),
+        location: compact(
+          card?.querySelector(".jobinfo__other-info-item")?.innerText ||
+            card?.querySelector(".jobinfo__other-info")?.innerText ||
+            ""
+        ),
+        cardText: compact(card?.innerText || card?.textContent || "").slice(0, 420),
       });
 
       if (cards.length >= ${Number(maxJobsPerQuery)}) {
@@ -654,29 +689,24 @@ function detailExtractionExpression() {
   return String.raw`(() => {
     const compact = (text) => (text || "").replace(/\s+/g, " ").trim();
     const bodyPreview = compact(document.body?.innerText || "").slice(0, 800);
-    const jobDescription =
-      compact(document.querySelector(".job-detail-section:not(.job-detail-company):not(.security-box) .job-sec-text")?.innerText) ||
-      compact(document.querySelector(".job-sec-text")?.innerText);
-    const companyIntro =
-      compact(document.querySelector(".job-detail-company .job-sec-text")?.innerText) ||
-      compact(document.querySelector(".company-info-box .job-sec-text")?.innerText) ||
-      compact(Array.from(document.querySelectorAll(".job-sec-text"))[1]?.innerText);
-    const headerText = compact(
-      document.querySelector(".job-primary, .job-banner, .job-info-primary, .job-detail-header")?.innerText ||
-        document.body?.innerText ||
-        ""
-    );
-    const salaryMatch = headerText.match(/(\d+(?:-\d+)?K(?:·\d+薪)?|面议)/i);
 
     return {
       title: document.title,
       url: location.href,
       blocked: ${BLOCKED_PATTERN}.test(document.title + " " + bodyPreview),
-      jobTitle: compact(document.querySelector("h1")?.innerText || document.querySelector(".job-title")?.innerText),
-      salary: salaryMatch ? salaryMatch[1] : "",
-      jobDescription,
-      companyIntro,
-      address: compact(document.querySelector(".job-location")?.innerText || ""),
+      jobTitle:
+        compact(document.querySelector(".summary-planes__title")?.innerText) ||
+        compact(document.querySelector("h1")?.innerText),
+      salary: compact(document.querySelector(".summary-planes__salary")?.innerText || ""),
+      updatedAt: compact(document.querySelector(".summary-planes__time")?.innerText || ""),
+      address: compact(document.querySelector(".job-address__content, .job-address")?.innerText || ""),
+      jobDescription:
+        compact(document.querySelector(".describtion-card")?.innerText || "")
+          .replace(/^职位描述\s*/, "")
+          .slice(0, 1400),
+      companyName: compact(document.querySelector(".company-info__name")?.innerText || ""),
+      companyMeta: compact(document.querySelector(".company-info__desc")?.innerText || ""),
+      companyBusiness: compact(document.querySelector(".company-info__business")?.innerText || "").slice(0, 700),
     };
   })()`;
 }
@@ -706,6 +736,7 @@ async function collectSearchJobs(cdp, options, keywordSet) {
           queryKeyword: keyword,
         }))
         .filter((card) => isUsableCompanyName(card.companyName))
+        .filter((card) => card.location.startsWith(city.name))
         .filter((card) => {
           if (seenJobUrls.has(card.jobUrl)) {
             return false;
@@ -826,12 +857,12 @@ async function main() {
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
 
-    console.log(`Wrote ${payload.leads.length} BOSS recruitment leads to ${outputPath}`);
+    console.log(`Wrote ${payload.leads.length} Zhaopin recruitment leads to ${outputPath}`);
     console.log(`Updated at: ${payload.updatedAt}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     console.error(
-      "If Chrome is not ready, run pnpm boss:browser, login to BOSS, then rerun pnpm boss:collect."
+      "If Chrome is not ready, run pnpm zhaopin:browser, login to Zhaopin, then rerun pnpm zhaopin:collect."
     );
     process.exitCode = 1;
   } finally {

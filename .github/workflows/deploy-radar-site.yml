@@ -51,3 +51,59 @@ jobs:
           SERVER_TARGET_DIR: ${{ secrets.SERVER_TARGET_DIR }}
         run: |
           rsync -avz --delete --exclude latest.json -e "ssh -p ${SERVER_PORT:-22}" out/ "${SERVER_USER}@${SERVER_HOST}:${SERVER_TARGET_DIR}/"
+          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" \
+            public/competitors.json \
+            public/china-admin-divisions.json \
+            "${SERVER_USER}@${SERVER_HOST}:${SERVER_TARGET_DIR}/"
+
+      - name: Sync backend and build scripts
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" server/ "${SERVER_USER}@${SERVER_HOST}:/home/ubuntu/yantai-radar-site/server/"
+          rsync -avz -e "ssh -p ${SERVER_PORT:-22}" scripts/build-sales-intel.mjs "${SERVER_USER}@${SERVER_HOST}:/home/ubuntu/yantai-radar-site/scripts/"
+
+      - name: Refresh server runtime
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -p "${SERVER_PORT:-22}" "${SERVER_USER}@${SERVER_HOST}" <<'EOF'
+          set -euo pipefail
+          mkdir -p /home/ubuntu/yantai-radar-site/scripts /home/ubuntu/yantai-radar-site/server/data
+          cd /home/ubuntu/yantai-radar-site/server
+          npm install --omit=dev
+
+          if [ -f /var/www/qn-message.com/latest.json ] || [ -f /var/www/qn-message.com/recruitment-leads-aggregate.json ]; then
+            node /home/ubuntu/yantai-radar-site/scripts/build-sales-intel.mjs \
+              --radar /var/www/qn-message.com/latest.json \
+              --recruitment /var/www/qn-message.com/recruitment-leads-aggregate.json \
+              --output /var/www/qn-message.com/sales-intel.json
+          fi
+
+          if [ -f /var/www/qn-message.com/competitors.json ]; then
+            node /home/ubuntu/yantai-radar-site/server/import-document.mjs \
+              --key competitors \
+              --input /var/www/qn-message.com/competitors.json \
+              --source github-actions-deploy
+          fi
+
+          if [ -f /var/www/qn-message.com/china-admin-divisions.json ]; then
+            node /home/ubuntu/yantai-radar-site/server/import-document.mjs \
+              --key adminDivisions \
+              --input /var/www/qn-message.com/china-admin-divisions.json \
+              --source github-actions-deploy
+          fi
+
+          if [ -f /var/www/qn-message.com/sales-intel.json ]; then
+            node /home/ubuntu/yantai-radar-site/server/import-document.mjs \
+              --key salesIntel \
+              --input /var/www/qn-message.com/sales-intel.json \
+              --source github-actions-deploy
+          fi
+
+          sudo systemctl restart radar-api.service
+          EOF

@@ -17,6 +17,12 @@
     "default_location": "烟台开发区"
   },
   "metrics": {
+    "sales_total": "销售总表",
+    "sales_total_detail": "统一汇总日报和招聘后的有效销售信息数量。",
+    "today_highlights": "当日十条",
+    "today_highlights_detail": "每日随机招聘聚合后沉淀下来的十条重点信息。",
+    "report_items": "日报信息",
+    "report_items_detail": "来自 OpenClaw 日报并已标准化的销售相关信息数量。",
     "high_priority": "高优线索",
     "high_priority_detail": "今天值得立刻跟进的对象数。",
     "potential_leads": "潜在线索",
@@ -42,7 +48,7 @@
     "title": "制造服务同行名片",
     "description": "地图负责空间感，名片负责细节。默认收起，点箭头或点地图点位再展开。",
     "baseline": "对标基准",
-    "all_cities": "全部城市",
+    "all_cities": "总数",
     "service_fit": "匹配度 {{fit}}",
     "fit_levels": {
       "high": "高",
@@ -65,11 +71,36 @@
     "checked_summary": "已勾选 {{count}} 项",
     "add_action": "添加城市",
     "remove_action": "移除 {{city}}",
-    "all_cities": "全部城市",
+    "all_cities": "总数",
     "synced_status": "已同步 {{count}} 家制造服务同行公司。",
     "filtered_status": "当前范围内共 {{count}} 家制造服务同行公司。",
     "default_note": "通过上方城市选择器可以扩展或收缩同行范围；地图与名片会同步刷新。",
     "filtered_note": "当前地图和名片已切换到所选城市范围。"
+  },
+  "sales_intel": {
+    "feed_eyebrow": "销售总表",
+    "feed_title": "所有相关销售及有用信息",
+    "today_eyebrow": "当日十条",
+    "today_title": "今日招聘聚合十条重点信息",
+    "today_description": "展示每日随机平台聚合后保留下来的十条重点信息，当前更新时间为 {{updatedAt}}。",
+    "today_count": "今日数量",
+    "total_label": "总数",
+    "last_updated": "统一更新时间：{{value}}",
+    "view": "查看",
+    "close": "关闭弹窗",
+    "detail": "详情",
+    "jobs": "关联岗位",
+    "evidence": "证据来源",
+    "open_source": "打开来源",
+    "strength": "强度 {{value}}",
+    "not_synced": "未同步",
+    "no_data": "暂无数据",
+    "source_kinds": {
+      "report": "日报 {{count}} 条 · {{updatedAt}}",
+      "recruitment": "招聘 {{count}} 条 · {{updatedAt}}"
+    },
+    "empty_feed": "当前还没有写入统一销售信息总表，等待日报和招聘聚合结果同步。",
+    "empty_today": "当前还没有同步到今日十条招聘重点信息。"
   },
   "sections": {
     "priority_eyebrow": "高优线索",

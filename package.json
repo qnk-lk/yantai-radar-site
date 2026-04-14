@@ -10,11 +10,20 @@
     "lint": "eslint",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
+    "sales-intel:build": "node scripts/build-sales-intel.mjs",
     "api:start": "node server/index.mjs --host 0.0.0.0",
     "api:dev": "node --watch server/index.mjs --host 0.0.0.0",
     "boss:browser": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-boss-chrome.ps1",
     "boss:collect": "node scripts/collect-boss-recruitment-leads.mjs",
-    "recruitment:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-local-recruitment-automation.ps1"
+    "boss:export-session": "node scripts/export-boss-session.mjs",
+    "boss:sync-session": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sync-boss-session-to-server.ps1",
+    "51job:collect": "node scripts/collect-51job-recruitment-leads.mjs",
+    "zhaopin:browser": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-zhaopin-chrome.ps1",
+    "zhaopin:collect": "node scripts/collect-zhaopin-recruitment-leads.mjs",
+    "zhaopin:export-session": "node scripts/export-zhaopin-session.mjs",
+    "zhaopin:sync-session": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sync-zhaopin-session-to-server.ps1",
+    "recruitment:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-local-recruitment-automation.ps1",
+    "recruitment:task:install": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-local-recruitment-task.ps1"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",

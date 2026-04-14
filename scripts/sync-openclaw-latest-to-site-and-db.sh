@@ -5,6 +5,8 @@ RUNS_DIR="${RUNS_DIR:-/home/ubuntu/.openclaw/cron/runs}"
 OUTPUT_PATH="${OUTPUT_PATH:-/var/www/qn-message.com/latest.json}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+RECRUITMENT_INPUT="${RECRUITMENT_INPUT:-/var/www/qn-message.com/recruitment-leads-aggregate.json}"
+SALES_INTEL_OUTPUT="${SALES_INTEL_OUTPUT:-/var/www/qn-message.com/sales-intel.json}"
 
 python3 "$SCRIPT_DIR/openclaw_summary_to_latest_json.py" \
   --runs-dir "$RUNS_DIR" \
@@ -14,3 +16,13 @@ node "$PROJECT_ROOT/server/import-document.mjs" \
   --key radar \
   --input "$OUTPUT_PATH" \
   --source "openclaw-cron-summary"
+
+node "$PROJECT_ROOT/scripts/build-sales-intel.mjs" \
+  --radar "$OUTPUT_PATH" \
+  --recruitment "$RECRUITMENT_INPUT" \
+  --output "$SALES_INTEL_OUTPUT"
+
+node "$PROJECT_ROOT/server/import-document.mjs" \
+  --key salesIntel \
+  --input "$SALES_INTEL_OUTPUT" \
+  --source "sales-intel-builder"

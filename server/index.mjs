@@ -74,6 +74,20 @@ function buildApp(config, db) {
     return document.payload;
   });
 
+  app.get("/api/sales/intel", async (_request, reply) => {
+    const document = readDocument(db, "salesIntel");
+
+    if (!document) {
+      reply.code(404);
+      return {
+        ok: false,
+        message: "Sales intel data not found",
+      };
+    }
+
+    return document.payload;
+  });
+
   app.get("/api/competitors/updates", async (request) => {
     const limit = Number(request.query?.limit);
 

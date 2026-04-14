@@ -18,6 +18,9 @@ export const DOCUMENT_DEFINITIONS = {
   radar: {
     fileName: "latest.json",
   },
+  salesIntel: {
+    fileName: "sales-intel.json",
+  },
   competitors: {
     fileName: "competitors.json",
   },

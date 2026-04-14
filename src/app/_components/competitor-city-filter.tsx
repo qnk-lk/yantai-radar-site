@@ -202,8 +202,8 @@ export function CompetitorCityFilter({
   }
 
   return (
-    <div className="space-y-4 rounded-3xl border border-(--color-line) bg-white/80 p-5">
-      <div className="space-y-2">
+    <div className="space-y-3 rounded-3xl border border-(--color-line) bg-white/80 p-4">
+      <div className="space-y-1.5">
         <p className="text-sm font-medium text-(--color-muted)">{t("city_filter.label")}</p>
 
         <div className="relative min-w-0">
@@ -235,7 +235,7 @@ export function CompetitorCityFilter({
 
                 openDropdown();
               }}
-              className="flex w-full items-center justify-between gap-3 rounded-[1.15rem] border border-(--color-line) bg-(--color-card-soft) px-4 py-3 text-left text-sm text-(--color-ink) transition hover:border-(--color-accent)/40 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-between gap-3 rounded-[1.15rem] border border-(--color-line) bg-(--color-card-soft) px-4 py-2.5 text-left text-sm text-(--color-ink) transition hover:border-(--color-accent)/40 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="truncate">
                 {summaryCount
@@ -252,16 +252,16 @@ export function CompetitorCityFilter({
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <p className="text-sm font-medium text-(--color-muted)">{t("city_filter.selected")}</p>
-        <div className="flex min-h-14 max-h-50 flex-wrap items-start gap-2 overflow-y-auto overscroll-y-contain rounded-[1.15rem] border border-(--color-line) bg-(--color-card-soft) px-3 py-3">
+        <div className="flex min-h-12 max-h-36 flex-wrap items-start gap-2 overflow-y-auto overscroll-y-contain rounded-[1.15rem] border border-(--color-line) bg-(--color-card-soft) px-3 py-2.5">
           {selectedCities.length ? (
             selectedCities.map((city) => (
               <button
                 key={city.key}
                 type="button"
                 onClick={() => onRemoveCity(city.key)}
-                className="inline-flex items-center gap-2 rounded-full border border-(--color-line) bg-white px-3 py-2 text-sm text-(--color-ink) transition hover:border-(--color-accent)/40 hover:text-(--color-accent)"
+                className="inline-flex items-center gap-2 rounded-full border border-(--color-line) bg-white px-3 py-1.5 text-sm text-(--color-ink) transition hover:border-(--color-accent)/40 hover:text-(--color-accent)"
                 aria-label={t("city_filter.remove_action", {
                   city: formatSelectedAreaName(city, resolvedLanguage),
                 })}

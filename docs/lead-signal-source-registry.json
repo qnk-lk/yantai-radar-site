@@ -1,0 +1,249 @@
+{
+  "version": "2026-04-14",
+  "purpose": "统一管理可用于反推制造业数字化线索的平台来源，不直接绑定 OpenClaw 运行规则。",
+  "scope": {
+    "regions": ["烟台", "青岛"],
+    "industries": ["MES", "WMS", "QMS", "智能制造", "工业互联网", "数字化工厂"]
+  },
+  "executionModes": [
+    {
+      "id": "browser_public",
+      "name": "浏览器公开页",
+      "description": "直接用浏览器打开网页即可采集，适合无人值守和服务器执行。"
+    },
+    {
+      "id": "browser_login",
+      "name": "浏览器登录态",
+      "description": "需要浏览器登录态或 cookie，可以接入服务器任务，但要维护会话。"
+    },
+    {
+      "id": "browser_discovery_only",
+      "name": "浏览器发现页",
+      "description": "更适合用于发现详情页链接，不建议直接作为最终证据来源。"
+    },
+    {
+      "id": "app_closed",
+      "name": "App 封闭生态",
+      "description": "主要依赖 App、强风控或设备校验，当前不适合直接纳入服务器无人值守主链路。"
+    }
+  ],
+  "signalTypes": [
+    "recruitment_demand",
+    "vendor_case",
+    "factory_upgrade",
+    "procurement_tender",
+    "company_profile",
+    "executive_activity",
+    "trade_show_activity",
+    "location_validation"
+  ],
+  "sources": [
+    {
+      "id": "boss_zhipin",
+      "name": "BOSS直聘",
+      "category": "招聘",
+      "phase": "phase_1",
+      "executionMode": "browser_login",
+      "priority": 1,
+      "signalStrength": "high",
+      "serverFeasibility": "verified",
+      "officialUrl": "https://www.zhipin.com/",
+      "coreSignals": [
+        "MES / WMS / QMS 相关岗位",
+        "实施 / 顾问 / 售前 / 项目经理岗位",
+        "工厂信息化、质量、仓储、生产相关岗位",
+        "服务商与制造企业的岗位差异"
+      ],
+      "notes": "已验证可像当前 BOSS 链路一样接入服务器浏览器任务。"
+    },
+    {
+      "id": "zhaopin",
+      "name": "智联招聘",
+      "category": "招聘",
+      "phase": "phase_1",
+      "executionMode": "browser_login",
+      "priority": 2,
+      "signalStrength": "high",
+      "serverFeasibility": "pending_verification",
+      "officialUrl": "https://www.zhaopin.com/",
+      "coreSignals": ["制造业数字化岗位", "管理层和职能类岗位", "公司规模、行业标签、地区标签"],
+      "notes": "应作为 BOSS 的第一优先互补来源，下一步单独验证服务器可行性。"
+    },
+    {
+      "id": "job51",
+      "name": "前程无忧 51Job",
+      "category": "招聘",
+      "phase": "phase_1",
+      "executionMode": "browser_login",
+      "priority": 3,
+      "signalStrength": "medium_high",
+      "serverFeasibility": "pending_verification",
+      "officialUrl": "https://www.51job.com/",
+      "coreSignals": [
+        "传统制造企业招聘需求",
+        "工厂 IT、ERP、MES 维护岗位",
+        "企业基础信息与地区信息"
+      ],
+      "notes": "补足偏传统制造企业的招聘信号。"
+    },
+    {
+      "id": "liepin",
+      "name": "猎聘",
+      "category": "招聘",
+      "phase": "phase_1",
+      "executionMode": "browser_login",
+      "priority": 4,
+      "signalStrength": "medium_high",
+      "serverFeasibility": "pending_verification",
+      "officialUrl": "https://www.liepin.com/",
+      "coreSignals": [
+        "中高端数字化岗位",
+        "信息化负责人、数字化总监、供应链负责人",
+        "预算与组织升级信号"
+      ],
+      "notes": "更偏组织升级和中高层岗位。"
+    },
+    {
+      "id": "ccgp",
+      "name": "中国政府采购网",
+      "category": "招采",
+      "phase": "phase_1",
+      "executionMode": "browser_public",
+      "priority": 5,
+      "signalStrength": "high",
+      "serverFeasibility": "high",
+      "officialUrl": "https://www.ccgp.gov.cn/",
+      "coreSignals": [
+        "MES / WMS / QMS 相关招标",
+        "数字化工厂、仓储升级、质量追溯项目",
+        "政府或国企采购需求"
+      ],
+      "notes": "适合纳入公共网页采集链路，直接反推项目和预算信号。"
+    },
+    {
+      "id": "qcc",
+      "name": "企查查",
+      "category": "企业信息",
+      "phase": "phase_1",
+      "executionMode": "browser_login",
+      "priority": 6,
+      "signalStrength": "medium_high",
+      "serverFeasibility": "pending_verification",
+      "officialUrl": "https://www.qcc.com/",
+      "coreSignals": [
+        "主营业务范围",
+        "招投标、知识产权、分支机构",
+        "企业变更、股权、司法与风险信息"
+      ],
+      "notes": "建议作为核验层，不单独产出高优先级线索。"
+    },
+    {
+      "id": "aiqicha",
+      "name": "爱企查",
+      "category": "企业信息",
+      "phase": "phase_1",
+      "executionMode": "browser_public",
+      "priority": 7,
+      "signalStrength": "medium",
+      "serverFeasibility": "high",
+      "officialUrl": "https://aiqicha.baidu.com/",
+      "coreSignals": ["企业基本工商信息", "关联企业和分支结构", "风险与资质补充核验"],
+      "notes": "可作为企查查补充，优先用于企业真实性核验。"
+    },
+    {
+      "id": "xiaohongshu",
+      "name": "小红书",
+      "category": "社交内容",
+      "phase": "phase_2",
+      "executionMode": "browser_login",
+      "priority": 8,
+      "signalStrength": "medium",
+      "serverFeasibility": "pending_verification",
+      "officialUrl": "https://www.xiaohongshu.com/explore",
+      "coreSignals": ["服务商案例分享", "工厂参观、项目上线、活动参展内容", "区域同行品牌动作"],
+      "notes": "更适合发现同行和案例，建议在招聘/企业核验之后接入。"
+    },
+    {
+      "id": "maimai",
+      "name": "脉脉",
+      "category": "职场社交",
+      "phase": "phase_2",
+      "executionMode": "browser_login",
+      "priority": 9,
+      "signalStrength": "medium_high",
+      "serverFeasibility": "pending_verification",
+      "officialUrl": "https://maimai.cn/",
+      "coreSignals": ["职场讨论和岗位流动", "组织架构调整", "项目预算、供应商评价、团队扩张信号"],
+      "notes": "价值高，但风控和登录要求预计高于招聘站点。"
+    },
+    {
+      "id": "zhihu",
+      "name": "知乎",
+      "category": "社区内容",
+      "phase": "phase_2",
+      "executionMode": "browser_public",
+      "priority": 10,
+      "signalStrength": "medium",
+      "serverFeasibility": "high",
+      "officialUrl": "https://www.zhihu.com/",
+      "coreSignals": ["MES / QMS / ERP 选型问答", "行业经验贴与实施复盘", "厂商口碑与关键词扩展"],
+      "notes": "适合做关键词扩展和口碑验证，不建议单独出结论。"
+    },
+    {
+      "id": "douyin",
+      "name": "抖音",
+      "category": "短视频",
+      "phase": "phase_3",
+      "executionMode": "app_closed",
+      "priority": 11,
+      "signalStrength": "medium",
+      "serverFeasibility": "low",
+      "officialUrl": "https://www.douyin.com/",
+      "coreSignals": ["工厂改造视频", "参展和客户拜访视频", "区域同行品牌曝光"],
+      "notes": "先保留为人工补查来源，不进当前服务器任务池。"
+    },
+    {
+      "id": "kuaishou",
+      "name": "快手",
+      "category": "短视频",
+      "phase": "phase_3",
+      "executionMode": "app_closed",
+      "priority": 12,
+      "signalStrength": "medium",
+      "serverFeasibility": "low",
+      "officialUrl": "https://www.kuaishou.com/",
+      "coreSignals": ["工厂现场视频", "设备、产线、仓储改造内容", "区域制造企业曝光"],
+      "notes": "更适合人工补查。"
+    },
+    {
+      "id": "wechat_ecosystem",
+      "name": "微信生态（公众号 / 视频号 / 搜一搜）",
+      "category": "社交内容",
+      "phase": "phase_3",
+      "executionMode": "app_closed",
+      "priority": 13,
+      "signalStrength": "medium_high",
+      "serverFeasibility": "low",
+      "officialUrl": "https://mp.weixin.qq.com/",
+      "coreSignals": ["企业官方活动与签约稿", "行业文章、会议和展会信息", "视频号内容传播"],
+      "notes": "信号价值高，但浏览器化稳定性差，当前只做补充来源。"
+    },
+    {
+      "id": "search_seed",
+      "name": "搜索引擎定向检索",
+      "category": "发现入口",
+      "phase": "phase_1",
+      "executionMode": "browser_discovery_only",
+      "priority": 14,
+      "signalStrength": "medium",
+      "serverFeasibility": "high",
+      "officialUrl": "https://www.bing.com/",
+      "coreSignals": [
+        "site 定向检索详情页",
+        "政府、园区、厂商官网详情页发现",
+        "关键词扩展与目标对象补全"
+      ],
+      "notes": "只负责发现详情页，不直接作为最终证据。"
+    }
+  ]
+}

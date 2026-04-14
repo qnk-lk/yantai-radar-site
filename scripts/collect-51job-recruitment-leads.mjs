@@ -6,15 +6,16 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_DEBUG_URL = "http://127.0.0.1:9223";
 const DEFAULT_CITIES = [
-  { name: "烟台", code: "101120500" },
-  { name: "青岛", code: "101120200" },
+  { name: "烟台", code: "120400" },
+  { name: "青岛", code: "120300" },
 ];
 const DEFAULT_KEYWORDS = ["MES", "WMS", "QMS", "智能制造"];
 const DEFAULT_MAX_COMPANIES = 10;
-const DEFAULT_MAX_JOBS_PER_QUERY = 15;
-const SEARCH_WAIT_MS = 5_500;
+const DEFAULT_MAX_JOBS_PER_QUERY = 20;
+const SEARCH_WAIT_MS = 5_000;
 const DETAIL_WAIT_MS = 3_500;
-const BOSS_BASE_URL = "https://www.zhipin.com";
+const SEARCH_BASE_URL = "https://we.51job.com/pc/search";
+const SEARCH_API_BASE_URL = "https://we.51job.com/api/job/search-pc";
 
 const KEYWORD_ALIASES = {
   MES: ["MES", "生产执行", "制造执行"],
@@ -30,29 +31,25 @@ const SERVICE_COMPANY_PATTERN =
   /软件|信息|网络|工业互联网|系统集成|咨询|解决方案|用友|金蝶|SAP|云平台|数据服务|物联|自动化|数字科技|智能工业|IT服务/i;
 const MANUFACTURING_COMPANY_PATTERN =
   /制造|新能源|能源|电子|半导体|汽车|机械|装备|电气|家纺|集团|工业|材料|食品|医药|生物|化工|仪器|光电|模具|工厂|生产/i;
-const SERVICE_JOB_PATTERN = /实施|顾问|售前|项目经理|产品经理|交付|架构/i;
+const SERVICE_JOB_PATTERN = /实施|顾问|售前|项目经理|产品经理|交付|架构|解决方案|软件销售/i;
 const INTERNAL_DIGITAL_JOB_PATTERN = /运维|工程师|主管|专员|总监|经理|生产|质量|仓储/i;
 const BLOCKED_PATTERN =
-  /请稍候|安全验证|验证码|异常访问|请登录后继续|security-check|captcha|登录注册/i;
-const CONTACT_LINE_PATTERN =
-  /立即沟通|感兴趣|微信|扫码|手机号|手机|电话|邮箱|HR|hr|人事|招聘者|在线简历|附件简历|竞争力分析|个人综合排名|举报|防骗|热线|客服|BOSS 安全提示/i;
+  /安全验证|滑动验证|访问异常|访问受限|验证码|页面暂时无法访问|访问验证|请完成验证|验证后继续访问/i;
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(currentFilePath), "..");
 
 function printHelp() {
   console.log(`Usage:
-  pnpm boss:browser
-  pnpm boss:collect -- --output .tmp/boss-recruitment-leads.json --max-companies 10
+  pnpm run 51job:collect -- --output .tmp/51job-recruitment-leads.json --max-companies 10
 
 Options:
   --debug-url <url>          Chrome remote debugging endpoint. Default: ${DEFAULT_DEBUG_URL}
-  --output <path>            Output JSON path. Default: .tmp/boss-recruitment-leads.json
+  --output <path>            Output JSON path. Default: .tmp/51job-recruitment-leads.json
   --max-companies <number>   Unique company limit. Default: ${DEFAULT_MAX_COMPANIES}
   --keywords <list>          Comma-separated keywords. Default: ${DEFAULT_KEYWORDS.join(",")}
-  --cities <list>            Comma-separated cityName:bossCityCode. Default: 烟台:101120500,青岛:101120200
+  --cities <list>            Comma-separated cityName:51jobAreaCode. Default: 烟台:120400,青岛:120300
   --max-jobs-per-query <n>   Search cards kept from each query. Default: ${DEFAULT_MAX_JOBS_PER_QUERY}
-  --session-file <path>      Optional BOSS cookie session JSON exported from a logged-in browser.
   --no-details               Do not open job detail pages; use search cards only.
 `);
 }
@@ -98,7 +95,7 @@ function parseCities(value) {
 
   const defaultCodeByName = new Map(DEFAULT_CITIES.map((city) => [city.name, city.code]));
   return value
-    .split(",")
+    .split(/[,;\s]+/)
     .map((item) => item.trim())
     .filter(Boolean)
     .map((item) => {
@@ -125,15 +122,15 @@ function parseArgs(argv) {
   return {
     debugUrl: readOption(argv, "debug-url") || DEFAULT_DEBUG_URL,
     output:
-      readOption(argv, "output") || path.join(projectRoot, ".tmp", "boss-recruitment-leads.json"),
-    sessionFile: readOption(argv, "session-file"),
+      readOption(argv, "output") ||
+      path.join(projectRoot, ".tmp", "51job-recruitment-leads.json"),
     maxCompanies: Math.max(
       1,
       Math.min(Number.isFinite(maxCompanies) ? maxCompanies : DEFAULT_MAX_COMPANIES, 30)
     ),
     maxJobsPerQuery: Math.max(
       1,
-      Math.min(Number.isFinite(maxJobsPerQuery) ? maxJobsPerQuery : DEFAULT_MAX_JOBS_PER_QUERY, 30)
+      Math.min(Number.isFinite(maxJobsPerQuery) ? maxJobsPerQuery : DEFAULT_MAX_JOBS_PER_QUERY, 40)
     ),
     keywords: parseList(readOption(argv, "keywords"), DEFAULT_KEYWORDS),
     cities: parseCities(readOption(argv, "cities")),
@@ -148,25 +145,11 @@ function compactText(value) {
 }
 
 function sanitizeText(value, maxLength = 260) {
-  const lines = String(value || "")
-    .split(/\r?\n| {2,}/)
-    .map((line) => compactText(line))
-    .filter(Boolean)
-    .filter((line) => !CONTACT_LINE_PATTERN.test(line));
-
-  return compactText(lines.join(" ")).slice(0, maxLength);
+  return compactText(value).slice(0, maxLength);
 }
 
 function normalizeOutputPath(outputPath) {
   return path.isAbsolute(outputPath) ? outputPath : path.resolve(projectRoot, outputPath);
-}
-
-function normalizeOptionalPath(filePath) {
-  if (!filePath) {
-    return "";
-  }
-
-  return path.isAbsolute(filePath) ? filePath : path.resolve(projectRoot, filePath);
 }
 
 function getShanghaiUpdatedAt() {
@@ -188,10 +171,44 @@ function getShanghaiUpdatedAt() {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} CST`;
 }
 
-function buildSearchUrl(city, keyword) {
-  const url = new URL("/web/geek/jobs", BOSS_BASE_URL);
-  url.searchParams.set("query", keyword);
-  url.searchParams.set("city", city.code);
+function buildSearchPageUrl(city, keyword) {
+  const url = new URL(SEARCH_BASE_URL);
+  url.searchParams.set("jobArea", city.code);
+  url.searchParams.set("keyword", keyword);
+  url.searchParams.set("searchType", "2");
+  url.searchParams.set("keywordType", "");
+  return url.toString();
+}
+
+function buildSearchApiUrl(city, keyword, maxJobsPerQuery) {
+  const url = new URL(SEARCH_API_BASE_URL);
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  url.searchParams.set("api_key", "51job");
+  url.searchParams.set("timestamp", timestamp);
+  url.searchParams.set("keyword", keyword);
+  url.searchParams.set("searchType", "2");
+  url.searchParams.set("function", "");
+  url.searchParams.set("industry", "");
+  url.searchParams.set("jobArea", city.code);
+  url.searchParams.set("jobArea2", "");
+  url.searchParams.set("landmark", "");
+  url.searchParams.set("metro", "");
+  url.searchParams.set("salary", "");
+  url.searchParams.set("workYear", "");
+  url.searchParams.set("degree", "");
+  url.searchParams.set("companyType", "");
+  url.searchParams.set("companySize", "");
+  url.searchParams.set("jobType", "");
+  url.searchParams.set("issueDate", "");
+  url.searchParams.set("sortType", "0");
+  url.searchParams.set("pageNum", "1");
+  url.searchParams.set("requestId", "");
+  url.searchParams.set("keywordType", "");
+  url.searchParams.set("pageSize", String(maxJobsPerQuery));
+  url.searchParams.set("source", "1");
+  url.searchParams.set("accountId", "");
+  url.searchParams.set("pageCode", "sou|sou|soulb");
+  url.searchParams.set("scene", "7");
   return url.toString();
 }
 
@@ -220,7 +237,7 @@ function createKeywordSet(keywords) {
 }
 
 function findKeywordHits(text, keywordSet) {
-  const source = text.toUpperCase();
+  const source = String(text || "").toUpperCase();
   return keywordSet.filter((keyword) => source.includes(keyword.toUpperCase()));
 }
 
@@ -233,7 +250,7 @@ function scoreJob(job, keywordSet) {
     score += 25;
   }
 
-  if (/实施|顾问|售前|项目|产品|开发|运维|工程师|主管|总监/i.test(job.jobTitle)) {
+  if (/实施|顾问|售前|项目|产品|开发|运维|工程师|主管|总监|销售/i.test(job.jobTitle)) {
     score += 8;
   }
 
@@ -315,7 +332,10 @@ function buildLeadStrength(keywordHits, jobTitle, description) {
 function createLeadFromJob(job, detail, rank, keywordSet) {
   const jobTitle = sanitizeText(detail?.jobTitle || job.jobTitle, 80);
   const description = sanitizeText(detail?.jobDescription || "", 360);
-  const companyIntro = sanitizeText(detail?.companyIntro || "", 360);
+  const companyIntro = sanitizeText(
+    `${detail?.companyMeta || ""} ${detail?.companyIntro || ""}`,
+    360
+  );
   const address = sanitizeText(detail?.address || "", 120);
   const salary = sanitizeText(detail?.salary || job.salary || "", 50);
   const evidenceText = `${jobTitle} ${job.cardText} ${description} ${companyIntro} ${job.queryKeyword}`;
@@ -326,7 +346,7 @@ function createLeadFromJob(job, detail, rank, keywordSet) {
     salary ? `薪资：${salary}` : "",
     address ? `地址：${address}` : "",
     description ? `岗位依据：${description}` : "",
-    companyIntro ? `公司介绍：${companyIntro}` : "",
+    companyIntro ? `公司信息：${companyIntro}` : "",
   ].filter(Boolean);
 
   return {
@@ -336,16 +356,16 @@ function createLeadFromJob(job, detail, rank, keywordSet) {
     companyCategory: classification.companyCategory,
     leadType: classification.leadType,
     leadStrength: buildLeadStrength(keywordHits, jobTitle, description),
-    signalSummary: `BOSS直聘出现“${jobTitle}”岗位，命中 ${keywordHits.length ? keywordHits.join("、") : job.queryKeyword} 等制造业数字化信号。`,
+    signalSummary: `前程无忧出现“${jobTitle}”岗位，命中 ${keywordHits.length ? keywordHits.join("、") : job.queryKeyword} 等制造业数字化信号。`,
     inferredNeed: classification.inferredNeed,
     matchedKeywords: keywordHits.length ? keywordHits : [job.queryKeyword],
     matchedJobs: [
       {
-        platform: "BOSS直聘",
+        platform: "前程无忧",
         jobTitle,
         city: job.city,
         salary,
-        publishedAt: "",
+        publishedAt: sanitizeText(detail?.updatedAt || job.updatedAt || "", 40),
         url: job.jobUrl,
         keywordHits: keywordHits.length ? keywordHits : [job.queryKeyword],
         descriptionEvidence: description || sanitizeText(job.cardText, 220),
@@ -353,14 +373,14 @@ function createLeadFromJob(job, detail, rank, keywordSet) {
     ],
     evidence: [
       {
-        source: "BOSS直聘职位页",
+        source: "前程无忧职位页",
         url: job.jobUrl,
         note: sanitizeText(evidenceNoteParts.join("；"), 520),
       },
     ],
     recommendedAction:
       "先核验公司官网、业务范围和近期招聘连续性，再按潜在客户或同行合作对象分层跟进。",
-    riskNotes: "仅基于公开招聘页面反推业务信号；已过滤个人联系方式。",
+    riskNotes: "仅基于公开招聘页面反推业务信号；未采集招聘联系人等个人信息。",
   };
 }
 
@@ -374,11 +394,11 @@ function mergeLead(lead, job, detail, keywordSet) {
 
   if (!urlExists) {
     lead.matchedJobs.push({
-      platform: "BOSS直聘",
+      platform: "前程无忧",
       jobTitle,
       city: job.city,
       salary: sanitizeText(detail?.salary || job.salary || "", 50),
-      publishedAt: "",
+      publishedAt: sanitizeText(detail?.updatedAt || job.updatedAt || "", 40),
       url: job.jobUrl,
       keywordHits: keywordHits.length ? keywordHits : [job.queryKeyword],
       descriptionEvidence: description || sanitizeText(job.cardText, 220),
@@ -396,24 +416,24 @@ function buildPayload({ leads, cities, keywords, maxCompanies, platformStatus, q
   return {
     updatedAt: getShanghaiUpdatedAt(),
     status: `已同步 ${effectiveCompanyCount} 家招聘信号反推线索公司。`,
-    note: "该数据由本地真实 Chrome 登录态抓取 BOSS 公开招聘页面生成，独立于日报和同行地图；不采集个人联系方式。",
+    note: "该数据由浏览器访问前程无忧公开搜索接口与职位详情页生成，独立于日报和同行地图；不采集个人联系方式。",
     strategy: {
       cities: cities.map((city) => city.name),
       targetCompanyLimit: maxCompanies,
-      primaryPlatforms: ["BOSS直聘", "智联招聘"],
-      fallbackPlatforms: ["前程无忧", "猎聘", "齐鲁人才网"],
+      primaryPlatforms: ["BOSS直聘", "智联招聘", "前程无忧"],
+      fallbackPlatforms: ["猎聘", "小红书", "企查查"],
       keywords,
     },
     platformCoverage: [
       {
-        platform: "BOSS直聘",
+        platform: "前程无忧",
         status: platformStatus,
         querySummary: queryLogs.join("；"),
         effectiveCompanyCount,
         note:
           platformStatus === "ok"
-            ? "通过本机已登录真实 Chrome 读取公开岗位和职位详情。"
-            : "BOSS 页面可能出现登录、验证码或安全校验，需要重新登录后再运行。",
+            ? "通过浏览器上下文访问搜索接口与职位详情页提取结构化招聘线索。"
+            : "前程无忧页面可能出现访问限制或接口异常，需要检查浏览器上下文和网络环境。",
       },
     ],
     leads,
@@ -558,44 +578,6 @@ class CdpClient {
     });
   }
 
-  async loadCookies(cookies) {
-    const filteredCookies = Array.isArray(cookies)
-      ? cookies
-          .filter((cookie) => cookie && typeof cookie.name === "string" && typeof cookie.value === "string")
-          .map((cookie) => {
-            const value = {
-              name: cookie.name,
-              value: cookie.value,
-              domain: cookie.domain,
-              path: cookie.path,
-              httpOnly: Boolean(cookie.httpOnly),
-              secure: Boolean(cookie.secure),
-            };
-
-            if (typeof cookie.sameSite === "string" && cookie.sameSite) {
-              value.sameSite = cookie.sameSite;
-            }
-
-            if (typeof cookie.expires === "number" && Number.isFinite(cookie.expires) && cookie.expires > 0) {
-              value.expires = cookie.expires;
-            }
-
-            if (typeof cookie.url === "string" && cookie.url) {
-              value.url = cookie.url;
-            }
-
-            return value;
-          })
-      : [];
-
-    if (filteredCookies.length === 0) {
-      return;
-    }
-
-    await this.send("Network.enable");
-    await this.send("Network.setCookies", { cookies: filteredCookies });
-  }
-
   async dispose() {
     try {
       this.ws?.close();
@@ -606,47 +588,65 @@ class CdpClient {
   }
 }
 
-function searchExtractionExpression(maxJobsPerQuery) {
-  return String.raw`(() => {
+function searchExtractionExpression(apiUrl) {
+  return String.raw`(async () => {
     const compact = (text) => (text || "").replace(/\s+/g, " ").trim();
-    const anchors = Array.from(document.querySelectorAll('a[href*="/job_detail/"]'));
-    const cards = [];
-    const seen = new Set();
+    const response = await fetch(${JSON.stringify(apiUrl)}, { credentials: "include" });
+    const text = await response.text();
+    const pagePreview = compact(document.body?.innerText || "").slice(0, 400);
 
-    for (const anchor of anchors) {
-      const card = anchor.closest(".job-card-box, .job-card-wrap, li") || anchor.parentElement;
-      const companyAnchor = card?.querySelector('a[href*="/gongsi/"], a[href*="/company"]');
-      const jobUrl = anchor.href;
-      const jobTitle = compact(anchor.innerText || anchor.textContent);
-      const companyName = compact(companyAnchor?.innerText || companyAnchor?.textContent);
+    try {
+      const payload = JSON.parse(text);
+      const items = payload?.resultbody?.job?.items || [];
 
-      if (!jobUrl || !jobTitle || seen.has(jobUrl)) {
-        continue;
-      }
-
-      seen.add(jobUrl);
-      cards.push({
-        jobTitle,
-        jobUrl,
-        companyName,
-        companyUrl: companyAnchor?.href || "",
-        salary: compact(card?.querySelector(".salary")?.innerText || ""),
-        cardText: compact(card?.innerText || card?.textContent || "").slice(0, 360),
-      });
-
-      if (cards.length >= ${Number(maxJobsPerQuery)}) {
-        break;
-      }
+      return {
+        statusCode: response.status,
+        pagePreview,
+        blocked: false,
+        items: items.map((item) => ({
+          jobTitle: compact(item.jobName),
+          jobUrl: item.jobHref || "",
+          companyName: compact(item.fullCompanyName || item.companyName),
+          companyUrl: item.companyHref || "",
+          salary: compact(item.provideSalaryString),
+          location: compact(item.jobAreaString),
+          updatedAt: compact(item.issueDateString),
+          jobTags: Array.isArray(item.jobTags) ? item.jobTags.map((tag) => compact(tag)).filter(Boolean) : [],
+          companyType: compact(item.companyTypeString),
+          companySize: compact(item.companySizeString),
+          industry: compact([item.industryType1Str, item.industryType2Str].filter(Boolean).join(" ")),
+          workYear: compact(item.workYearString),
+          degree: compact(item.degreeString),
+          cardText: compact(
+            [
+              item.jobName,
+              item.provideSalaryString,
+              item.jobAreaString,
+              item.workYearString,
+              item.degreeString,
+              ...(Array.isArray(item.jobTags) ? item.jobTags : []),
+              item.fullCompanyName || item.companyName,
+              item.companyTypeString,
+              item.companySizeString,
+              item.industryType1Str,
+              item.industryType2Str,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          ).slice(0, 420),
+        })),
+      };
+    } catch (error) {
+      const preview = compact(text).slice(0, 500);
+      return {
+        statusCode: response.status,
+        pagePreview,
+        blocked: ${BLOCKED_PATTERN}.test(preview),
+        parseFailed: true,
+        preview,
+        items: [],
+      };
     }
-
-    const bodyPreview = compact(document.body?.innerText || "").slice(0, 500);
-    return {
-      title: document.title,
-      url: location.href,
-      bodyPreview,
-      blocked: ${BLOCKED_PATTERN}.test(document.title + " " + bodyPreview),
-      cards,
-    };
   })()`;
 }
 
@@ -654,29 +654,24 @@ function detailExtractionExpression() {
   return String.raw`(() => {
     const compact = (text) => (text || "").replace(/\s+/g, " ").trim();
     const bodyPreview = compact(document.body?.innerText || "").slice(0, 800);
-    const jobDescription =
-      compact(document.querySelector(".job-detail-section:not(.job-detail-company):not(.security-box) .job-sec-text")?.innerText) ||
-      compact(document.querySelector(".job-sec-text")?.innerText);
-    const companyIntro =
-      compact(document.querySelector(".job-detail-company .job-sec-text")?.innerText) ||
-      compact(document.querySelector(".company-info-box .job-sec-text")?.innerText) ||
-      compact(Array.from(document.querySelectorAll(".job-sec-text"))[1]?.innerText);
-    const headerText = compact(
-      document.querySelector(".job-primary, .job-banner, .job-info-primary, .job-detail-header")?.innerText ||
-        document.body?.innerText ||
-        ""
+    const addressNode = Array.from(document.querySelectorAll(".fp, p, div")).find((node) =>
+      compact(node.innerText || "").startsWith("上班地址：")
     );
-    const salaryMatch = headerText.match(/(\d+(?:-\d+)?K(?:·\d+薪)?|面议)/i);
 
     return {
       title: document.title,
-      url: location.href,
-      blocked: ${BLOCKED_PATTERN}.test(document.title + " " + bodyPreview),
-      jobTitle: compact(document.querySelector("h1")?.innerText || document.querySelector(".job-title")?.innerText),
-      salary: salaryMatch ? salaryMatch[1] : "",
-      jobDescription,
-      companyIntro,
-      address: compact(document.querySelector(".job-location")?.innerText || ""),
+      blocked:
+        !document.querySelector("h1") && ${BLOCKED_PATTERN}.test(document.title + " " + bodyPreview),
+      jobTitle: compact(document.querySelector("h1")?.innerText || ""),
+      salary: compact(document.querySelector(".cn strong")?.innerText || ""),
+      updatedAt: compact(document.querySelector(".cn .msg.ltype")?.innerText || ""),
+      address: compact((addressNode?.innerText || "").replace(/^上班地址：/, "")),
+      jobDescription: compact(document.querySelector(".bmsg.job_msg.inbox")?.innerText || "").slice(0, 1400),
+      companyName:
+        compact(document.querySelector(".com_name")?.innerText || "") ||
+        compact(document.querySelector(".com_msg")?.innerText || ""),
+      companyMeta: compact(document.querySelector(".com_tag")?.innerText || ""),
+      companyIntro: compact(document.querySelector(".tmsg.inbox")?.innerText || "").slice(0, 700),
     };
   })()`;
 }
@@ -689,9 +684,10 @@ async function collectSearchJobs(cdp, options, keywordSet) {
 
   for (const city of options.cities) {
     for (const keyword of options.keywords) {
-      const searchUrl = buildSearchUrl(city, keyword);
-      await cdp.navigate(searchUrl, SEARCH_WAIT_MS);
-      const result = await cdp.evaluate(searchExtractionExpression(options.maxJobsPerQuery));
+      await cdp.navigate(buildSearchPageUrl(city, keyword), SEARCH_WAIT_MS);
+      const result = await cdp.evaluate(
+        searchExtractionExpression(buildSearchApiUrl(city, keyword, options.maxJobsPerQuery))
+      );
 
       if (result.blocked) {
         blockedCount += 1;
@@ -699,30 +695,31 @@ async function collectSearchJobs(cdp, options, keywordSet) {
         continue;
       }
 
-      const validCards = result.cards
-        .map((card) => ({
-          ...card,
+      const validItems = (result.items || [])
+        .map((item) => ({
+          ...item,
           city: city.name,
           queryKeyword: keyword,
         }))
-        .filter((card) => isUsableCompanyName(card.companyName))
-        .filter((card) => {
-          if (seenJobUrls.has(card.jobUrl)) {
+        .filter((item) => item.jobTitle && item.jobUrl && isUsableCompanyName(item.companyName))
+        .filter((item) => item.location.startsWith(city.name))
+        .filter((item) => {
+          if (seenJobUrls.has(item.jobUrl)) {
             return false;
           }
 
-          seenJobUrls.add(card.jobUrl);
+          seenJobUrls.add(item.jobUrl);
           return true;
         });
 
-      for (const card of validCards) {
+      for (const item of validItems) {
         jobs.push({
-          ...card,
-          searchScore: scoreJob(card, keywordSet),
+          ...item,
+          searchScore: scoreJob(item, keywordSet),
         });
       }
 
-      queryLogs.push(`${city.name}/${keyword}: ${validCards.length}`);
+      queryLogs.push(`${city.name}/${keyword}: ${validItems.length}`);
     }
   }
 
@@ -812,27 +809,19 @@ async function collectLeads(cdp, options) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const outputPath = normalizeOutputPath(options.output);
-  const sessionFilePath = normalizeOptionalPath(options.sessionFile);
   const cdp = new CdpClient(options.debugUrl);
 
   try {
     await cdp.connect();
-    if (sessionFilePath) {
-      const sessionPayload = JSON.parse(await fs.readFile(sessionFilePath, "utf-8"));
-      await cdp.loadCookies(sessionPayload.cookies);
-    }
     const payload = await collectLeads(cdp, options);
 
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
 
-    console.log(`Wrote ${payload.leads.length} BOSS recruitment leads to ${outputPath}`);
+    console.log(`Wrote ${payload.leads.length} 51job recruitment leads to ${outputPath}`);
     console.log(`Updated at: ${payload.updatedAt}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
-    console.error(
-      "If Chrome is not ready, run pnpm boss:browser, login to BOSS, then rerun pnpm boss:collect."
-    );
     process.exitCode = 1;
   } finally {
     await cdp.dispose();

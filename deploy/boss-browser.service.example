@@ -1,0 +1,15 @@
+[Unit]
+Description=BOSS Chrome Browser
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/yantai-radar-site
+ExecStart=/usr/bin/env bash /home/ubuntu/yantai-radar-site/scripts/server-start-boss-browser.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
