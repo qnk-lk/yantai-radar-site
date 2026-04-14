@@ -13,7 +13,8 @@
     "api:start": "node server/index.mjs --host 0.0.0.0",
     "api:dev": "node --watch server/index.mjs --host 0.0.0.0",
     "boss:browser": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-boss-chrome.ps1",
-    "boss:collect": "node scripts/collect-boss-recruitment-leads.mjs"
+    "boss:collect": "node scripts/collect-boss-recruitment-leads.mjs",
+    "recruitment:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-local-recruitment-automation.ps1"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
