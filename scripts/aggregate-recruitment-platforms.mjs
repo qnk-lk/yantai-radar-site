@@ -129,6 +129,10 @@ function mergeLeadRecords(left, right) {
     [...(left.matchedJobs || []), ...(right.matchedJobs || [])],
     (item) => `${item.platform || ""}::${item.url || ""}::${item.jobTitle || ""}`
   );
+  const allJobs = uniqueBy(
+    [...(left.allJobs || []), ...(right.allJobs || [])],
+    (item) => `${item.platform || ""}::${item.url || ""}::${item.jobTitle || ""}`
+  );
   const evidence = uniqueBy(
     [...(left.evidence || []), ...(right.evidence || [])],
     (item) => `${item.source || ""}::${item.url || ""}`
@@ -156,6 +160,7 @@ function mergeLeadRecords(left, right) {
     inferredNeed: preferKnownValue(left.inferredNeed, right.inferredNeed, ""),
     matchedKeywords,
     matchedJobs,
+    allJobs,
     evidence,
     sourcePlatforms,
     recommendedAction: left.recommendedAction || right.recommendedAction || "",
@@ -213,6 +218,7 @@ async function main() {
       const enrichedLead = {
         ...lead,
         retrievedAt: compactText(lead.retrievedAt || payload.updatedAt),
+        allJobs: Array.isArray(lead?.allJobs) ? lead.allJobs : lead?.matchedJobs || [],
         sourcePlatforms: uniqueBy(
           [
             ...(lead.sourcePlatforms || []),

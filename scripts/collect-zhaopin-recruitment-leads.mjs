@@ -12,6 +12,7 @@ const DEFAULT_CITIES = [
 const DEFAULT_KEYWORDS = ["MES", "WMS", "QMS", "智能制造"];
 const DEFAULT_MAX_COMPANIES = 10;
 const DEFAULT_MAX_JOBS_PER_QUERY = 15;
+const DEFAULT_MAX_ALL_JOBS_PER_COMPANY = 20;
 const SEARCH_WAIT_MS = 5_500;
 const DETAIL_WAIT_MS = 3_500;
 const ZHAOPIN_BASE_URL = "https://sou.zhaopin.com/";
@@ -54,8 +55,10 @@ Options:
   --keywords <list>          Comma-separated keywords. Default: ${DEFAULT_KEYWORDS.join(",")}
   --cities <list>            Comma-separated cityName:zhaopinCityCode. Default: 烟台:707,青岛:703
   --max-jobs-per-query <n>   Search cards kept from each query. Default: ${DEFAULT_MAX_JOBS_PER_QUERY}
+  --max-all-jobs-per-company <n>  Company jobs kept in second-pass search. Default: ${DEFAULT_MAX_ALL_JOBS_PER_COMPANY}
   --session-file <path>      Optional Zhaopin cookie session JSON exported from a logged-in browser.
   --no-details               Do not open job detail pages; use search cards only.
+  --no-all-jobs              Do not run the second-pass company job expansion.
 `);
 }
 
@@ -123,6 +126,9 @@ function parseArgs(argv) {
   const maxJobsPerQuery = Number(
     readOption(argv, "max-jobs-per-query") || DEFAULT_MAX_JOBS_PER_QUERY
   );
+  const maxAllJobsPerCompany = Number(
+    readOption(argv, "max-all-jobs-per-company") || DEFAULT_MAX_ALL_JOBS_PER_COMPANY
+  );
 
   return {
     debugUrl: readOption(argv, "debug-url") || DEFAULT_DEBUG_URL,
@@ -138,9 +144,19 @@ function parseArgs(argv) {
       1,
       Math.min(Number.isFinite(maxJobsPerQuery) ? maxJobsPerQuery : DEFAULT_MAX_JOBS_PER_QUERY, 30)
     ),
+    maxAllJobsPerCompany: Math.max(
+      1,
+      Math.min(
+        Number.isFinite(maxAllJobsPerCompany)
+          ? maxAllJobsPerCompany
+          : DEFAULT_MAX_ALL_JOBS_PER_COMPANY,
+        30
+      )
+    ),
     keywords: parseList(readOption(argv, "keywords"), DEFAULT_KEYWORDS),
     cities: parseCities(readOption(argv, "cities")),
     includeDetails: !hasFlag(argv, "no-details"),
+    includeAllJobs: !hasFlag(argv, "no-all-jobs"),
   };
 }
 
@@ -177,6 +193,87 @@ function normalizeOptionalPath(filePath) {
   }
 
   return path.isAbsolute(filePath) ? filePath : path.resolve(projectRoot, filePath);
+}
+
+function normalizeCompanyName(value) {
+  return sanitizeText(value, 120)
+    .replace(/[\s()（）[\]【】]/g, "")
+    .toUpperCase();
+}
+
+function isSameCompanyName(left, right) {
+  const leftValue = normalizeCompanyName(left);
+  const rightValue = normalizeCompanyName(right);
+
+  if (!leftValue || !rightValue) {
+    return false;
+  }
+
+  if (leftValue === rightValue) {
+    return true;
+  }
+
+  return (
+    Math.min(leftValue.length, rightValue.length) >= 6 &&
+    (leftValue.includes(rightValue) || rightValue.includes(leftValue))
+  );
+}
+
+function createCollectedJobIdentity(job) {
+  return [
+    sanitizeText(job?.platform, 40),
+    sanitizeText(job?.url, 300),
+    sanitizeText(job?.jobTitle, 120),
+    sanitizeText(job?.city, 40),
+  ].join("::");
+}
+
+function normalizeCollectedJob(job, fallbackPlatform, fallbackCity) {
+  return {
+    platform: sanitizeText(job?.platform || fallbackPlatform, 40),
+    jobTitle: sanitizeText(job?.jobTitle, 120),
+    city: sanitizeText(job?.city || fallbackCity, 40),
+    salary: sanitizeText(job?.salary, 50),
+    publishedAt: sanitizeText(job?.publishedAt, 40),
+    url: sanitizeText(job?.url, 300),
+    keywordHits: Array.isArray(job?.keywordHits)
+      ? [...new Set(job.keywordHits.map((item) => sanitizeText(item, 30)).filter(Boolean))]
+      : [],
+    descriptionEvidence: sanitizeText(job?.descriptionEvidence, 360),
+  };
+}
+
+function mergeCollectedJobs(previousJobs, currentJobs, fallbackPlatform, fallbackCity) {
+  const mergedMap = new Map();
+
+  for (const job of [...(previousJobs || []), ...(currentJobs || [])]) {
+    const normalizedJob = normalizeCollectedJob(job, fallbackPlatform, fallbackCity);
+    const identity = createCollectedJobIdentity(normalizedJob);
+    if (!identity) {
+      continue;
+    }
+
+    const existingJob = mergedMap.get(identity);
+    if (!existingJob) {
+      mergedMap.set(identity, normalizedJob);
+      continue;
+    }
+
+    mergedMap.set(identity, {
+      ...existingJob,
+      ...normalizedJob,
+      platform: normalizedJob.platform || existingJob.platform,
+      jobTitle: normalizedJob.jobTitle || existingJob.jobTitle,
+      city: normalizedJob.city || existingJob.city,
+      salary: normalizedJob.salary || existingJob.salary,
+      publishedAt: normalizedJob.publishedAt || existingJob.publishedAt,
+      url: normalizedJob.url || existingJob.url,
+      keywordHits: [...new Set([...(existingJob.keywordHits || []), ...(normalizedJob.keywordHits || [])])],
+      descriptionEvidence: normalizedJob.descriptionEvidence || existingJob.descriptionEvidence,
+    });
+  }
+
+  return [...mergedMap.values()];
 }
 
 function getShanghaiUpdatedAt() {
@@ -364,6 +461,7 @@ function createLeadFromJob(job, detail, rank, keywordSet) {
         descriptionEvidence: description || sanitizeText(job.cardText, 220),
       },
     ],
+    allJobs: [],
     evidence: [
       {
         source: "智联招聘职位页",
@@ -788,6 +886,52 @@ function orderJobsForCityBalance(jobs, cities) {
   return orderedJobs;
 }
 
+function createCompanySearchJob(card, companyName, city, matchedJobsByUrl) {
+  const matchedJob = matchedJobsByUrl.get(sanitizeText(card?.jobUrl, 300));
+  return normalizeCollectedJob(
+    {
+      platform: "智联招聘",
+      jobTitle: sanitizeText(card?.jobTitle, 120),
+      city,
+      salary: sanitizeText(card?.salary, 50),
+      publishedAt: matchedJob?.publishedAt || "",
+      url: sanitizeText(card?.jobUrl, 300),
+      keywordHits: matchedJob?.keywordHits || [],
+      descriptionEvidence:
+        matchedJob?.descriptionEvidence || sanitizeText(card?.cardText, 320) || companyName,
+    },
+    "智联招聘",
+    city
+  );
+}
+
+async function collectAllJobsForLead(cdp, lead, options) {
+  const city = options.cities.find((item) => item.name === lead.city);
+  if (!city) {
+    return mergeCollectedJobs(lead.matchedJobs, [], "智联招聘", lead.city);
+  }
+
+  const matchedJobsByUrl = new Map(
+    (lead.matchedJobs || []).map((job) => [sanitizeText(job?.url, 300), job])
+  );
+  const companySearchUrl = buildSearchUrl(city, lead.companyName);
+  await cdp.navigate(companySearchUrl, SEARCH_WAIT_MS);
+  const result = await cdp.evaluate(searchExtractionExpression(options.maxAllJobsPerCompany));
+
+  if (result?.blocked) {
+    return mergeCollectedJobs(lead.matchedJobs, [], "智联招聘", lead.city);
+  }
+
+  const companyJobs = (result?.cards || [])
+    .filter((card) => card?.jobTitle && card?.jobUrl)
+    .filter((card) => isSameCompanyName(card.companyName, lead.companyName))
+    .filter((card) => !card.location || String(card.location).startsWith(lead.city))
+    .slice(0, options.maxAllJobsPerCompany)
+    .map((card) => createCompanySearchJob(card, lead.companyName, lead.city, matchedJobsByUrl));
+
+  return mergeCollectedJobs(lead.matchedJobs, companyJobs, "智联招聘", lead.city);
+}
+
 async function collectLeads(cdp, options) {
   const keywordSet = createKeywordSet(options.keywords);
   const { jobs, queryLogs, platformStatus } = await collectSearchJobs(cdp, options, keywordSet);
@@ -828,6 +972,12 @@ async function collectLeads(cdp, options) {
     const lead = createLeadFromJob(job, detail, leads.length + 1, keywordSet);
     leads.push(lead);
     leadByCompany.set(companyKey, lead);
+  }
+
+  for (const lead of leads) {
+    lead.allJobs = options.includeAllJobs
+      ? await collectAllJobsForLead(cdp, lead, options)
+      : mergeCollectedJobs(lead.matchedJobs, [], "智联招聘", lead.city);
   }
 
   return buildPayload({

@@ -38,6 +38,7 @@ export type SalesIntelItem = {
   detailRows: SalesIntelDetailRow[];
   evidence: SalesIntelEvidence[];
   matchedJobs: SalesIntelMatchedJob[];
+  allJobs?: SalesIntelMatchedJob[];
 };
 
 export type SalesIntelData = {

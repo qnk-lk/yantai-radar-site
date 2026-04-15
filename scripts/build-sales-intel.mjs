@@ -92,6 +92,173 @@ function compareTimestampDesc(left, right) {
   return 0;
 }
 
+function splitSourceLabels(value) {
+  return String(value || "")
+    .split(/[、,，]/u)
+    .map((item) => sanitizeText(item, 40))
+    .filter(Boolean);
+}
+
+function createMatchedJobIdentity(job) {
+  return [
+    sanitizeText(job?.platform, 40),
+    sanitizeText(job?.url, 300),
+    sanitizeText(job?.jobTitle, 120),
+    sanitizeText(job?.city, 40),
+  ].join("::");
+}
+
+function normalizeMatchedJob(job) {
+  return {
+    platform: sanitizeText(job?.platform, 40),
+    jobTitle: sanitizeText(job?.jobTitle, 120),
+    city: sanitizeText(job?.city, 40),
+    salary: sanitizeText(job?.salary, 40),
+    publishedAt: sanitizeText(job?.publishedAt, 40),
+    url: sanitizeText(job?.url, 300),
+    keywordHits: uniqueStrings(
+      Array.isArray(job?.keywordHits) ? job.keywordHits.map((item) => sanitizeText(item, 30)) : []
+    ).sort((left, right) => left.localeCompare(right, "zh-CN")),
+    descriptionEvidence: sanitizeText(job?.descriptionEvidence, 320),
+  };
+}
+
+function mergeMatchedJobs(previousJobs, currentJobs) {
+  const mergedMap = new Map();
+
+  for (const job of Array.isArray(previousJobs) ? previousJobs : []) {
+    const normalizedJob = normalizeMatchedJob(job);
+    const identity = createMatchedJobIdentity(normalizedJob);
+    if (identity) {
+      mergedMap.set(identity, normalizedJob);
+    }
+  }
+
+  for (const job of Array.isArray(currentJobs) ? currentJobs : []) {
+    const normalizedJob = normalizeMatchedJob(job);
+    const identity = createMatchedJobIdentity(normalizedJob);
+    if (!identity) {
+      continue;
+    }
+
+    const existingJob = mergedMap.get(identity);
+    if (!existingJob) {
+      mergedMap.set(identity, normalizedJob);
+      continue;
+    }
+
+    mergedMap.set(identity, {
+      ...existingJob,
+      ...normalizedJob,
+      platform: normalizedJob.platform || existingJob.platform,
+      jobTitle: normalizedJob.jobTitle || existingJob.jobTitle,
+      city: normalizedJob.city || existingJob.city,
+      salary: normalizedJob.salary || existingJob.salary,
+      publishedAt: normalizedJob.publishedAt || existingJob.publishedAt,
+      url: normalizedJob.url || existingJob.url,
+      keywordHits: uniqueStrings([...(existingJob.keywordHits || []), ...(normalizedJob.keywordHits || [])]).sort(
+        (left, right) => left.localeCompare(right, "zh-CN")
+      ),
+      descriptionEvidence: normalizedJob.descriptionEvidence || existingJob.descriptionEvidence,
+    });
+  }
+
+  return [...mergedMap.values()].sort((left, right) =>
+    createMatchedJobIdentity(left).localeCompare(createMatchedJobIdentity(right), "zh-CN")
+  );
+}
+
+function createEvidenceIdentity(item) {
+  return [sanitizeText(item?.source, 80), sanitizeText(item?.url, 300)].join("::");
+}
+
+function normalizeEvidenceItem(item) {
+  return {
+    source: sanitizeText(item?.source, 80),
+    url: sanitizeText(item?.url, 300),
+    note: sanitizeText(item?.note, 320),
+  };
+}
+
+function mergeEvidenceItems(previousEvidence, currentEvidence) {
+  const mergedMap = new Map();
+
+  for (const item of Array.isArray(previousEvidence) ? previousEvidence : []) {
+    const normalizedItem = normalizeEvidenceItem(item);
+    const identity = createEvidenceIdentity(normalizedItem);
+    if (identity) {
+      mergedMap.set(identity, normalizedItem);
+    }
+  }
+
+  for (const item of Array.isArray(currentEvidence) ? currentEvidence : []) {
+    const normalizedItem = normalizeEvidenceItem(item);
+    const identity = createEvidenceIdentity(normalizedItem);
+    if (!identity) {
+      continue;
+    }
+
+    const existingItem = mergedMap.get(identity);
+    if (!existingItem) {
+      mergedMap.set(identity, normalizedItem);
+      continue;
+    }
+
+    mergedMap.set(identity, {
+      ...existingItem,
+      ...normalizedItem,
+      source: normalizedItem.source || existingItem.source,
+      url: normalizedItem.url || existingItem.url,
+      note: normalizedItem.note || existingItem.note,
+    });
+  }
+
+  return [...mergedMap.values()].sort((left, right) =>
+    createEvidenceIdentity(left).localeCompare(createEvidenceIdentity(right), "zh-CN")
+  );
+}
+
+function applyDetailRowOverrides(rows, overrides) {
+  const rowMap = new Map();
+  const order = [];
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const label = sanitizeText(row?.label, 60);
+    const value = sanitizeText(row?.value, 600);
+    if (!label) {
+      continue;
+    }
+
+    if (!rowMap.has(label)) {
+      order.push(label);
+    }
+
+    rowMap.set(label, {
+      label,
+      value,
+    });
+  }
+
+  for (const [labelRaw, valueRaw] of overrides) {
+    const label = sanitizeText(labelRaw, 60);
+    const value = sanitizeText(valueRaw, 600);
+    if (!label || !value) {
+      continue;
+    }
+
+    if (!rowMap.has(label)) {
+      order.push(label);
+    }
+
+    rowMap.set(label, {
+      label,
+      value,
+    });
+  }
+
+  return order.map((label) => rowMap.get(label)).filter((item) => item?.value);
+}
+
 async function readJsonSafe(filePath, fallback) {
   if (!filePath) {
     return fallback;
@@ -154,6 +321,7 @@ function transformRadarEntry(category, entry, fallbackUpdatedAt, index) {
     ]),
     evidence: [],
     matchedJobs: [],
+    allJobs: [],
   };
 }
 
@@ -183,6 +351,7 @@ function transformRadarAction(action, fallbackUpdatedAt, index) {
     ]),
     evidence: [],
     matchedJobs: [],
+    allJobs: [],
   };
 }
 
@@ -208,11 +377,25 @@ function transformRecruitmentLead(lead, fallbackUpdatedAt, index) {
         descriptionEvidence: sanitizeText(job?.descriptionEvidence, 320),
       }))
     : [];
+  const allJobs = Array.isArray(lead?.allJobs)
+    ? lead.allJobs.map((job) => ({
+        platform: sanitizeText(job?.platform, 40),
+        jobTitle: sanitizeText(job?.jobTitle, 120),
+        city: sanitizeText(job?.city, 40),
+        salary: sanitizeText(job?.salary, 40),
+        publishedAt: sanitizeText(job?.publishedAt, 40),
+        url: sanitizeText(job?.url, 300),
+        keywordHits: Array.isArray(job?.keywordHits)
+          ? job.keywordHits.map((item) => sanitizeText(item, 30)).filter(Boolean)
+          : [],
+        descriptionEvidence: sanitizeText(job?.descriptionEvidence, 320),
+      }))
+    : matchedJobs;
 
   const leadCategory = sanitizeText(lead?.leadType, 40) || "聚合信号";
 
   return {
-    id: createId("recruitment", lead?.companyName, lead?.city, lead?.rank || index),
+    id: createId("recruitment", lead?.companyName, lead?.city),
     kind: "recruitment",
     retrievedAt: sanitizeText(lead?.retrievedAt || fallbackUpdatedAt, 40),
     category: leadCategory,
@@ -255,6 +438,7 @@ function transformRecruitmentLead(lead, fallbackUpdatedAt, index) {
         }))
       : [],
     matchedJobs,
+    allJobs,
   };
 }
 
@@ -288,6 +472,300 @@ function buildRecruitmentItems(recruitmentPayload) {
   const leads = Array.isArray(recruitmentPayload?.leads) ? recruitmentPayload.leads : [];
   const updatedAt = sanitizeText(recruitmentPayload?.updatedAt);
   return leads.map((lead, index) => transformRecruitmentLead(lead, updatedAt, index));
+}
+
+function createHistoricalRecruitmentKey(item) {
+  const entity = sanitizeText(item?.entity || item?.title, 120);
+  const location = sanitizeText(item?.location, 60);
+  return `${entity}::${location}`;
+}
+
+function buildRecruitmentFingerprintPayload(item) {
+  const matchedJobs = mergeMatchedJobs([], item?.matchedJobs || []);
+  const allJobs = mergeMatchedJobs([], item?.allJobs || item?.matchedJobs || []);
+  const evidence = mergeEvidenceItems([], item?.evidence || []);
+
+  return {
+    entity: sanitizeText(item?.entity || item?.title, 120),
+    location: sanitizeText(item?.location, 60),
+    category: sanitizeText(item?.category, 40),
+    strength: sanitizeText(item?.strength, 40),
+    sourcePlatforms: uniqueStrings([
+      ...splitSourceLabels(item?.sourceLabel),
+      ...matchedJobs.map((job) => sanitizeText(job?.platform, 40)),
+    ]).sort((left, right) => left.localeCompare(right, "zh-CN")),
+    matchedJobs: matchedJobs.map((job) => ({
+      platform: job.platform,
+      jobTitle: job.jobTitle,
+      city: job.city,
+      salary: job.salary,
+      publishedAt: job.publishedAt,
+      url: job.url,
+      keywordHits: [...(job.keywordHits || [])],
+      descriptionEvidence: job.descriptionEvidence,
+    })),
+    allJobs: allJobs.map((job) => ({
+      platform: job.platform,
+      jobTitle: job.jobTitle,
+      city: job.city,
+      salary: job.salary,
+      publishedAt: job.publishedAt,
+      url: job.url,
+      keywordHits: [...(job.keywordHits || [])],
+      descriptionEvidence: job.descriptionEvidence,
+    })),
+    evidence: evidence.map((item) => ({
+      source: item.source,
+      url: item.url,
+      note: item.note,
+    })),
+  };
+}
+
+function computeRecruitmentFingerprint(item) {
+  return createHash("sha1")
+    .update(JSON.stringify(buildRecruitmentFingerprintPayload(item)), "utf8")
+    .digest("hex");
+}
+
+function collectRecruitmentChangeFlags(previousItem, mergedItem) {
+  const previousFingerprintPayload = buildRecruitmentFingerprintPayload(previousItem);
+  const mergedFingerprintPayload = buildRecruitmentFingerprintPayload(mergedItem);
+  const changeFlags = [];
+
+  const previousPlatforms = new Set(previousFingerprintPayload.sourcePlatforms);
+  if (
+    mergedFingerprintPayload.sourcePlatforms.some((platform) => !previousPlatforms.has(platform))
+  ) {
+    changeFlags.push("new_platform");
+  }
+
+  const previousJobs = new Map(
+    previousFingerprintPayload.matchedJobs.map((job) => [createMatchedJobIdentity(job), job])
+  );
+  let hasNewJob = false;
+  let hasUpdatedJob = false;
+
+  for (const job of mergedFingerprintPayload.matchedJobs) {
+    const identity = createMatchedJobIdentity(job);
+    const previousJob = previousJobs.get(identity);
+    if (!previousJob) {
+      hasNewJob = true;
+      continue;
+    }
+
+    if (JSON.stringify(previousJob) !== JSON.stringify(job)) {
+      hasUpdatedJob = true;
+    }
+  }
+
+  if (hasNewJob) {
+    changeFlags.push("new_job");
+  }
+
+  if (hasUpdatedJob) {
+    changeFlags.push("job_updated");
+  }
+
+  const previousEvidenceIds = new Set(
+    previousFingerprintPayload.evidence.map((item) => createEvidenceIdentity(item))
+  );
+  if (
+    mergedFingerprintPayload.evidence.some(
+      (item) => !previousEvidenceIds.has(createEvidenceIdentity(item))
+    )
+  ) {
+    changeFlags.push("new_evidence");
+  }
+
+  if (previousFingerprintPayload.category !== mergedFingerprintPayload.category) {
+    changeFlags.push("category_changed");
+  }
+
+  if (previousFingerprintPayload.strength !== mergedFingerprintPayload.strength) {
+    changeFlags.push("strength_changed");
+  }
+
+  if (
+    sanitizeText(previousItem?.publishedAt, 40) !== sanitizeText(mergedItem?.publishedAt, 40) &&
+    sanitizeText(mergedItem?.publishedAt, 40)
+  ) {
+    changeFlags.push("published_at_changed");
+  }
+
+  return uniqueStrings(changeFlags);
+}
+
+function mergeDetailRows(leftRows, rightRows) {
+  const leftList = Array.isArray(leftRows) ? leftRows : [];
+  const rightList = Array.isArray(rightRows) ? rightRows : [];
+  const mergedMap = new Map();
+
+  for (const row of leftList) {
+    const label = sanitizeText(row?.label, 60);
+    const value = sanitizeText(row?.value, 600);
+    if (label && value) {
+      mergedMap.set(label, { label, value });
+    }
+  }
+
+  for (const row of rightList) {
+    const label = sanitizeText(row?.label, 60);
+    const value = sanitizeText(row?.value, 600);
+    if (label && value) {
+      mergedMap.set(label, { label, value });
+    }
+  }
+
+  const orderedLabels = uniqueStrings(
+    [...rightList, ...leftList].map((row) => sanitizeText(row?.label, 60))
+  );
+
+  return orderedLabels.map((label) => mergedMap.get(label)).filter(Boolean);
+}
+
+function buildMergedRecruitmentCandidate(previousItem, currentItem) {
+  const currentIsNewer =
+    compareTimestampDesc(previousItem?.retrievedAt, currentItem?.retrievedAt) > 0;
+  const preferred = currentIsNewer ? currentItem : previousItem;
+  const fallback = currentIsNewer ? previousItem : currentItem;
+  const matchedJobs = mergeMatchedJobs(previousItem?.matchedJobs || [], currentItem?.matchedJobs || []);
+  const allJobs = mergeMatchedJobs(
+    previousItem?.allJobs || previousItem?.matchedJobs || [],
+    currentItem?.allJobs || currentItem?.matchedJobs || []
+  );
+  const evidence = mergeEvidenceItems(previousItem?.evidence || [], currentItem?.evidence || []);
+  const sourceLabel = uniqueStrings([
+    ...splitSourceLabels(previousItem?.sourceLabel),
+    ...splitSourceLabels(currentItem?.sourceLabel),
+    ...matchedJobs.map((job) => sanitizeText(job?.platform, 40)),
+  ]).join("、");
+
+  return {
+    ...fallback,
+    ...preferred,
+    id:
+      sanitizeText(currentItem?.id, 80) ||
+      sanitizeText(previousItem?.id, 80) ||
+      createId("recruitment", preferred?.title, preferred?.location),
+    kind: "recruitment",
+    sourceLabel,
+    matchedJobs,
+    allJobs,
+    evidence,
+    tags: uniqueStrings([...(previousItem?.tags || []), ...(currentItem?.tags || [])]).slice(0, 8),
+    detailRows: mergeDetailRows(previousItem?.detailRows, currentItem?.detailRows),
+    publishedAt:
+      latestJobPublishedAt(matchedJobs) ||
+      sanitizeText(currentItem?.publishedAt, 40) ||
+      sanitizeText(previousItem?.publishedAt, 40),
+    category:
+      sanitizeText(preferred?.category, 40) || sanitizeText(fallback?.category, 40) || "聚合信号",
+    title: sanitizeText(preferred?.title, 120) || sanitizeText(fallback?.title, 120),
+    subtitle: sanitizeText(preferred?.subtitle, 160) || sanitizeText(fallback?.subtitle, 160),
+    summary: sanitizeText(currentItem?.summary, 260) || sanitizeText(previousItem?.summary, 260),
+    location: sanitizeText(preferred?.location, 60) || sanitizeText(fallback?.location, 60),
+    entity: sanitizeText(preferred?.entity, 120) || sanitizeText(fallback?.entity, 120),
+    strength: sanitizeText(preferred?.strength, 40) || sanitizeText(fallback?.strength, 40),
+    actionText:
+      sanitizeText(currentItem?.actionText, 160) || sanitizeText(previousItem?.actionText, 160),
+  };
+}
+
+function mergeHistoricalRecruitmentItem(previousItem, currentItem) {
+  const previousFingerprint =
+    sanitizeText(previousItem?.historyFingerprint, 80) ||
+    computeRecruitmentFingerprint(previousItem);
+  const mergedCandidate = buildMergedRecruitmentCandidate(previousItem, currentItem);
+  const mergedFingerprint = computeRecruitmentFingerprint(mergedCandidate);
+  const lastSeenAt = pickNewestTimestamp(
+    previousItem?.lastSeenAt,
+    previousItem?.retrievedAt,
+    currentItem?.lastSeenAt,
+    currentItem?.retrievedAt
+  );
+  const changeFlags = collectRecruitmentChangeFlags(previousItem, mergedCandidate);
+  const hasMaterialChange =
+    previousFingerprint !== mergedFingerprint || changeFlags.length > 0;
+
+  if (!hasMaterialChange) {
+    return {
+      ...previousItem,
+      lastSeenAt,
+      lastChangedAt:
+        sanitizeText(previousItem?.lastChangedAt, 40) ||
+        sanitizeText(previousItem?.retrievedAt, 40),
+      historyFingerprint: previousFingerprint,
+      changeFlags: Array.isArray(previousItem?.changeFlags)
+        ? previousItem.changeFlags
+        : [],
+    };
+  }
+
+  const nextRetrievedAt =
+    sanitizeText(currentItem?.retrievedAt, 40) ||
+    sanitizeText(lastSeenAt, 40) ||
+    sanitizeText(previousItem?.retrievedAt, 40);
+
+  return {
+    ...mergedCandidate,
+    retrievedAt: nextRetrievedAt,
+    lastSeenAt,
+    lastChangedAt: nextRetrievedAt,
+    historyFingerprint: mergedFingerprint,
+    changeFlags,
+    detailRows: applyDetailRowOverrides(mergedCandidate.detailRows, [
+      ["检索时间", nextRetrievedAt],
+      ["来源平台", mergedCandidate.sourceLabel],
+      ["时间", mergedCandidate.publishedAt],
+      ["强度", mergedCandidate.strength],
+      ["建议动作", mergedCandidate.actionText],
+    ]),
+  };
+}
+
+function buildHistoricalRecruitmentItems(existingPayload, currentRecruitmentItems) {
+  const existingRecruitmentItems = Array.isArray(existingPayload?.feed)
+    ? existingPayload.feed.filter((item) => item?.kind === "recruitment")
+    : [];
+
+  const historyMap = new Map();
+
+  for (const item of existingRecruitmentItems) {
+    const key = createHistoricalRecruitmentKey(item);
+    if (!key) {
+      continue;
+    }
+
+    historyMap.set(key, item);
+  }
+
+  for (const item of currentRecruitmentItems) {
+    const key = createHistoricalRecruitmentKey(item);
+    if (!key) {
+      continue;
+    }
+
+    const preparedItem = {
+      ...item,
+      lastSeenAt: sanitizeText(item?.retrievedAt, 40),
+      lastChangedAt: sanitizeText(item?.retrievedAt, 40),
+      historyFingerprint: computeRecruitmentFingerprint(item),
+      changeFlags: [],
+      matchedJobs: mergeMatchedJobs([], item?.matchedJobs || []),
+      allJobs: mergeMatchedJobs([], item?.allJobs || item?.matchedJobs || []),
+      evidence: mergeEvidenceItems([], item?.evidence || []),
+    };
+
+    if (!historyMap.has(key)) {
+      historyMap.set(key, preparedItem);
+      continue;
+    }
+
+    historyMap.set(key, mergeHistoricalRecruitmentItem(historyMap.get(key), preparedItem));
+  }
+
+  return sortSalesIntelItems([...historyMap.values()]);
 }
 
 function sortSalesIntelItems(items) {
@@ -378,9 +856,14 @@ async function main() {
 
   const radarPayload = await readJsonSafe(radarPath, {});
   const recruitmentPayload = await readJsonSafe(recruitmentPath, {});
+  const existingSalesIntelPayload = await readJsonSafe(outputPath, {});
   const reportItems = buildReportItems(radarPayload);
-  const recruitmentItems = sortSalesIntelItems(buildRecruitmentItems(recruitmentPayload));
-  const todayHighlights = recruitmentItems.slice(0, 10);
+  const currentRecruitmentItems = sortSalesIntelItems(buildRecruitmentItems(recruitmentPayload));
+  const recruitmentItems = buildHistoricalRecruitmentItems(
+    existingSalesIntelPayload,
+    currentRecruitmentItems
+  );
+  const todayHighlights = currentRecruitmentItems.slice(0, 10);
   const updatedAt =
     pickNewestTimestamp(radarPayload?.updatedAt, recruitmentPayload?.updatedAt) ||
     sanitizeText(radarPayload?.updatedAt || recruitmentPayload?.updatedAt || "等待首次统一同步");
