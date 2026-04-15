@@ -63,6 +63,10 @@ PY
     --input "$TMP_OUTPUT" \
     --source "zhaopin-server-run"
 
+  if [[ "${SKIP_SALES_INTEL_SYNC:-0}" != "1" ]]; then
+    ADD_PLATFORM="$PLATFORM_NAME" bash "$PROJECT_ROOT/scripts/server-refresh-sales-intel.sh"
+  fi
+
   write_status "ok" "智联招聘服务器定时采集成功。"
   echo "[$(timestamp)] zhaopin recruitment run completed"
 } >>"$LOG_FILE" 2>&1 || {

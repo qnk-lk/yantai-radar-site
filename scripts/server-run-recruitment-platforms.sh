@@ -37,8 +37,6 @@ PLATFORMS=(
 
   total_leads=0
   selected_names=()
-  aggregate_inputs=()
-
   for index in "${!SELECTED_PLATFORMS[@]}"; do
     entry="${SELECTED_PLATFORMS[$index]}"
     IFS='|' read -r platform_name runner_script output_file <<<"$entry"
@@ -53,7 +51,7 @@ PLATFORMS=(
     per_platform_limit=$(( (remaining + platforms_left - 1) / platforms_left ))
 
     echo "[$(timestamp)] running $platform_name with per-platform limit $per_platform_limit and remaining limit $remaining"
-    if MAX_COMPANIES="$per_platform_limit" KEYWORDS="$KEYWORDS" bash "$runner_script"; then
+    if SKIP_SALES_INTEL_SYNC=1 MAX_COMPANIES="$per_platform_limit" KEYWORDS="$KEYWORDS" bash "$runner_script"; then
       if [[ -f "$output_file" ]]; then
         lead_count="$(read_lead_count "$output_file")"
       else
@@ -62,7 +60,6 @@ PLATFORMS=(
 
       total_leads=$((total_leads + lead_count))
       selected_names+=("$platform_name")
-      aggregate_inputs+=("$output_file")
       echo "[$(timestamp)] $platform_name completed with $lead_count leads; total=$total_leads"
     else
       rc=$?
@@ -70,37 +67,18 @@ PLATFORMS=(
     fi
   done
 
-  if (( ${#aggregate_inputs[@]} > 0 )); then
-    aggregate_args=()
-    for input_file in "${aggregate_inputs[@]}"; do
-      aggregate_args+=("--input" "$input_file")
-    done
-
+  if (( ${#selected_names[@]} > 0 )); then
     IFS=','
     selected_csv="${selected_names[*]}"
     unset IFS
 
-    node "$PROJECT_ROOT/scripts/aggregate-recruitment-platforms.mjs" \
-      --output "$AGGREGATE_OUTPUT" \
-      --lead-limit "$LEAD_LIMIT" \
-      --platform-limit "$PLATFORM_LIMIT" \
-      --selected-platforms "$selected_csv" \
-      "${aggregate_args[@]}"
-
-    node "$PROJECT_ROOT/server/import-document.mjs" \
-      --key recruitmentLeadsAggregate \
-      --input "$AGGREGATE_OUTPUT" \
-      --source "recruitment-dispatcher"
-
-    node "$PROJECT_ROOT/scripts/build-sales-intel.mjs" \
-      --radar "$RADAR_LATEST_INPUT" \
-      --recruitment "$AGGREGATE_OUTPUT" \
-      --output "$SALES_INTEL_OUTPUT"
-
-    node "$PROJECT_ROOT/server/import-document.mjs" \
-      --key salesIntel \
-      --input "$SALES_INTEL_OUTPUT" \
-      --source "sales-intel-builder"
+    SET_SELECTED_PLATFORMS="$selected_csv" \
+    LEAD_LIMIT="$LEAD_LIMIT" \
+    PLATFORM_LIMIT="$PLATFORM_LIMIT" \
+    RADAR_INPUT="$RADAR_LATEST_INPUT" \
+    AGGREGATE_OUTPUT="$AGGREGATE_OUTPUT" \
+    SALES_INTEL_OUTPUT="$SALES_INTEL_OUTPUT" \
+    bash "$PROJECT_ROOT/scripts/server-refresh-sales-intel.sh"
   fi
 
   echo "[$(timestamp)] recruitment dispatcher completed"

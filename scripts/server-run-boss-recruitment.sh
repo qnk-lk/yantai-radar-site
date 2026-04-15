@@ -63,6 +63,10 @@ PY
     --input "$TMP_OUTPUT" \
     --source "boss-server-run"
 
+  if [[ "${SKIP_SALES_INTEL_SYNC:-0}" != "1" ]]; then
+    ADD_PLATFORM="$PLATFORM_NAME" bash "$PROJECT_ROOT/scripts/server-refresh-sales-intel.sh"
+  fi
+
   write_status "ok" "BOSS 服务器定时采集成功。"
   echo "[$(timestamp)] boss recruitment run completed"
 } >>"$LOG_FILE" 2>&1 || {

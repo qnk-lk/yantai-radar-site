@@ -63,6 +63,10 @@ PY
     --input "$TMP_OUTPUT" \
     --source "xiaohongshu-server-run"
 
+  if [[ "${SKIP_SALES_INTEL_SYNC:-0}" != "1" ]]; then
+    ADD_PLATFORM="$PLATFORM_NAME" bash "$PROJECT_ROOT/scripts/server-refresh-sales-intel.sh"
+  fi
+
   write_status "ok" "小红书服务器采集成功。"
   echo "[$(timestamp)] xiaohongshu signal run completed"
 } >>"$LOG_FILE" 2>&1 || {
