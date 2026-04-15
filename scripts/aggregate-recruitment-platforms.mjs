@@ -3,6 +3,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { objectMentionsExcludedEntity } from "./lib/excluded-entities.mjs";
+
 function readOption(argv, name) {
   const flag = `--${name}`;
   const equalsPrefix = `${flag}=`;
@@ -214,6 +216,10 @@ async function main() {
 
   for (const { payload } of payloadEntries) {
     for (const lead of payload.leads || []) {
+      if (objectMentionsExcludedEntity(lead)) {
+        continue;
+      }
+
       const key = `${lead.city || ""}::${lead.companyName || ""}`;
       const enrichedLead = {
         ...lead,
@@ -238,6 +244,7 @@ async function main() {
   }
 
   const leads = [...leadMap.values()]
+    .filter((lead) => !objectMentionsExcludedEntity(lead))
     .sort((left, right) => {
       const strengthDifference = strengthScore(right.leadStrength) - strengthScore(left.leadStrength);
       if (strengthDifference !== 0) {

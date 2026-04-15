@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { objectMentionsExcludedEntity, rerankRecords } from "./lib/excluded-entities.mjs";
+
 const DEFAULT_DEBUG_URL = "http://127.0.0.1:9224";
 const DEFAULT_CITIES = [
   { name: "烟台", code: "707" },
@@ -970,6 +972,10 @@ async function collectLeads(cdp, options) {
     }
 
     const lead = createLeadFromJob(job, detail, leads.length + 1, keywordSet);
+    if (objectMentionsExcludedEntity(lead)) {
+      continue;
+    }
+
     leads.push(lead);
     leadByCompany.set(companyKey, lead);
   }
@@ -981,7 +987,7 @@ async function collectLeads(cdp, options) {
   }
 
   return buildPayload({
-    leads,
+    leads: rerankRecords(leads),
     cities: options.cities,
     keywords: options.keywords,
     maxCompanies: options.maxCompanies,

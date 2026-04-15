@@ -4,6 +4,8 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { filterExcludedEntities, objectMentionsExcludedEntity } from "./lib/excluded-entities.mjs";
+
 function readOption(argv, name) {
   const flag = `--${name}`;
   const equalsPrefix = `${flag}=`;
@@ -465,13 +467,15 @@ function buildReportItems(radarPayload) {
     items.push(transformRadarAction(action, updatedAt, index));
   });
 
-  return items;
+  return filterExcludedEntities(items);
 }
 
 function buildRecruitmentItems(recruitmentPayload) {
   const leads = Array.isArray(recruitmentPayload?.leads) ? recruitmentPayload.leads : [];
   const updatedAt = sanitizeText(recruitmentPayload?.updatedAt);
-  return leads.map((lead, index) => transformRecruitmentLead(lead, updatedAt, index));
+  return filterExcludedEntities(
+    leads.map((lead, index) => transformRecruitmentLead(lead, updatedAt, index))
+  );
 }
 
 function createHistoricalRecruitmentKey(item) {
@@ -726,7 +730,9 @@ function mergeHistoricalRecruitmentItem(previousItem, currentItem) {
 
 function buildHistoricalRecruitmentItems(existingPayload, currentRecruitmentItems) {
   const existingRecruitmentItems = Array.isArray(existingPayload?.feed)
-    ? existingPayload.feed.filter((item) => item?.kind === "recruitment")
+    ? existingPayload.feed.filter(
+        (item) => item?.kind === "recruitment" && !objectMentionsExcludedEntity(item)
+      )
     : [];
 
   const historyMap = new Map();
@@ -765,7 +771,7 @@ function buildHistoricalRecruitmentItems(existingPayload, currentRecruitmentItem
     historyMap.set(key, mergeHistoricalRecruitmentItem(historyMap.get(key), preparedItem));
   }
 
-  return sortSalesIntelItems([...historyMap.values()]);
+  return sortSalesIntelItems(filterExcludedEntities([...historyMap.values()]));
 }
 
 function sortSalesIntelItems(items) {
@@ -863,7 +869,7 @@ async function main() {
     existingSalesIntelPayload,
     currentRecruitmentItems
   );
-  const todayHighlights = currentRecruitmentItems.slice(0, 10);
+  const todayHighlights = filterExcludedEntities(currentRecruitmentItems).slice(0, 10);
   const updatedAt =
     pickNewestTimestamp(radarPayload?.updatedAt, recruitmentPayload?.updatedAt) ||
     sanitizeText(radarPayload?.updatedAt || recruitmentPayload?.updatedAt || "等待首次统一同步");
@@ -895,7 +901,7 @@ async function main() {
         updatedAt: sanitizeText(recruitmentPayload?.updatedAt),
       },
     ],
-    feed: sortSalesIntelItems([...reportItems, ...recruitmentItems]),
+    feed: sortSalesIntelItems(filterExcludedEntities([...reportItems, ...recruitmentItems])),
     todayHighlights,
   };
 

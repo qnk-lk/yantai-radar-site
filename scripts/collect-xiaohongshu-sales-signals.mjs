@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { objectMentionsExcludedEntity, rerankRecords } from "./lib/excluded-entities.mjs";
+
 const DEFAULT_DEBUG_URL = "http://127.0.0.1:9225";
 const DEFAULT_QUERIES = [
   "烟台 MES",
@@ -914,14 +916,21 @@ async function collectSignals(cdp, options) {
     }
 
     const { signal, lead } = createSignal(mergedDetail, signals.length + 1, keywordSet, retrievedAt);
+    if (objectMentionsExcludedEntity(signal) || objectMentionsExcludedEntity(lead)) {
+      continue;
+    }
+
     signals.push(signal);
     leads.push(lead);
     seenNoteIds.add(noteId);
   }
 
+  const filteredSignals = rerankRecords(signals);
+  const filteredLeads = rerankRecords(leads);
+
   return buildPayload({
-    signals,
-    leads,
+    signals: filteredSignals,
+    leads: filteredLeads,
     queries: options.queries,
     maxSignals: options.maxSignals,
     platformStatus,
