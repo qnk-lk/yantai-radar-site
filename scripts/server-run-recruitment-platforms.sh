@@ -25,6 +25,7 @@ PLATFORMS=(
   "BOSS直聘|$PROJECT_ROOT/scripts/server-run-boss-recruitment.sh|/var/www/qn-message.com/recruitment-leads.json"
   "智联招聘|$PROJECT_ROOT/scripts/server-run-zhaopin-recruitment.sh|/var/www/qn-message.com/recruitment-leads-zhaopin.json"
   "前程无忧|$PROJECT_ROOT/scripts/server-run-51job-recruitment.sh|/var/www/qn-message.com/recruitment-leads-51job.json"
+  "小红书|$PROJECT_ROOT/scripts/server-run-xiaohongshu-signals.sh|/var/www/qn-message.com/social-signals-xiaohongshu.json"
 )
 
 {
@@ -52,7 +53,7 @@ PLATFORMS=(
     per_platform_limit=$(( (remaining + platforms_left - 1) / platforms_left ))
 
     echo "[$(timestamp)] running $platform_name with per-platform limit $per_platform_limit and remaining limit $remaining"
-    if MAX_COMPANIES="$per_platform_limit" KEYWORDS="$KEYWORDS" "$runner_script"; then
+    if MAX_COMPANIES="$per_platform_limit" KEYWORDS="$KEYWORDS" bash "$runner_script"; then
       if [[ -f "$output_file" ]]; then
         lead_count="$(read_lead_count "$output_file")"
       else

@@ -248,8 +248,8 @@ async function main() {
 
   const mergedPayload = {
     updatedAt: getShanghaiUpdatedAt(),
-    status: `已聚合 ${leads.length} 家招聘信号反推线索公司。`,
-    note: "该数据由招聘平台统一调度器顺序执行生成；每日随机抽取平台，并在达到总线索阈值后停止。",
+    status: `已聚合 ${leads.length} 条多平台销售线索。`,
+    note: "该数据由多平台统一调度器顺序执行生成；每日随机抽取平台，并在达到总线索阈值后停止。",
     strategy: {
       platformLimit: Number.isFinite(platformLimit) ? platformLimit : 3,
       leadLimit: Number.isFinite(leadLimit) ? leadLimit : 10,

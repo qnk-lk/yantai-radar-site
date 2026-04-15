@@ -209,11 +209,13 @@ function transformRecruitmentLead(lead, fallbackUpdatedAt, index) {
       }))
     : [];
 
+  const leadCategory = sanitizeText(lead?.leadType, 40) || "聚合信号";
+
   return {
     id: createId("recruitment", lead?.companyName, lead?.city, lead?.rank || index),
     kind: "recruitment",
     retrievedAt: sanitizeText(lead?.retrievedAt || fallbackUpdatedAt, 40),
-    category: "招聘信号",
+    category: leadCategory,
     title: sanitizeText(lead?.companyName || `招聘线索 ${index + 1}`, 120),
     subtitle: sanitizeText(
       [lead?.city, lead?.companyCategory, lead?.leadStrength].filter(Boolean).join(" · "),
@@ -341,7 +343,7 @@ function extractTodaySearchItems(recruitmentPayload, recruitmentItems) {
 function buildSummary(radarPayload, recruitmentPayload, reportCount, recruitmentCount) {
   const focus =
     sanitizeText(radarPayload?.summary?.focus, 240) ||
-    "把日报与招聘聚合后的销售相关信息统一到一个面板里查看。";
+    "把日报与多平台聚合后的销售相关信息统一到一个面板里查看。";
   const statusParts = [
     sanitizeText(radarPayload?.summary?.status, 180),
     sanitizeText(recruitmentPayload?.status, 180),
@@ -358,7 +360,7 @@ function buildSummary(radarPayload, recruitmentPayload, reportCount, recruitment
       `当前已汇总 ${reportCount + recruitmentCount} 条销售相关信息。`,
     note:
       noteParts.join(" ") ||
-      "该面板会同时吸收 OpenClaw 日报和招聘平台聚合结果。",
+      "该面板会同时吸收 OpenClaw 日报和多平台聚合结果。",
   };
 }
 
