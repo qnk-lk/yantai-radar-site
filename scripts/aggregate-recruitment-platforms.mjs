@@ -50,9 +50,7 @@ function compactText(value) {
 }
 
 function getSortKey(value) {
-  const match = String(value || "").match(
-    /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/
-  );
+  const match = String(value || "").match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
 
   return match ? match.slice(1).join("") : "";
 }
@@ -63,7 +61,9 @@ function pickNewestTimestamp(...values) {
     return compactText(values.find(Boolean) || "");
   }
 
-  return [...validValues].sort((left, right) => getSortKey(right).localeCompare(getSortKey(left)))[0];
+  return [...validValues].sort((left, right) =>
+    getSortKey(right).localeCompare(getSortKey(left))
+  )[0];
 }
 
 function getShanghaiUpdatedAt() {
@@ -183,10 +183,40 @@ async function readPayload(filePath) {
   };
 }
 
+async function readJsonSafe(filePath, fallback = {}) {
+  if (!filePath) {
+    return fallback;
+  }
+
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function createLeadHistoryKey(lead) {
+  const city = compactText(lead?.city || lead?.location);
+  const companyName = compactText(lead?.companyName || lead?.entity || lead?.title);
+  return `${city}::${companyName}`;
+}
+
+function createHistoryKeySet(historyPayload) {
+  const items = Array.isArray(historyPayload?.feed) ? historyPayload.feed : [];
+  return new Set(
+    items
+      .filter((item) => item?.kind === "recruitment")
+      .map((item) => createLeadHistoryKey(item))
+      .filter((item) => item !== "::")
+  );
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const outputPath = readOption(argv, "output");
   const inputPaths = readRepeatedOption(argv, "input");
+  const historyPath = readOption(argv, "history");
   const leadLimit = Number(readOption(argv, "lead-limit") || "10");
   const platformLimit = Number(readOption(argv, "platform-limit") || "3");
   const selectedPlatforms = readOption(argv, "selected-platforms")
@@ -200,6 +230,7 @@ async function main() {
     );
   }
 
+  const historyKeySet = createHistoryKeySet(await readJsonSafe(historyPath));
   const payloadEntries = [];
   for (const inputPath of inputPaths) {
     try {
@@ -209,9 +240,7 @@ async function main() {
     }
   }
 
-  const platformCoverage = payloadEntries.flatMap(
-    ({ payload }) => payload.platformCoverage || []
-  );
+  const platformCoverage = payloadEntries.flatMap(({ payload }) => payload.platformCoverage || []);
   const leadMap = new Map();
 
   for (const { payload } of payloadEntries) {
@@ -246,18 +275,35 @@ async function main() {
   const leads = [...leadMap.values()]
     .filter((lead) => !objectMentionsExcludedEntity(lead))
     .sort((left, right) => {
-      const strengthDifference = strengthScore(right.leadStrength) - strengthScore(left.leadStrength);
+      const noveltyDifference =
+        Number(historyKeySet.has(createLeadHistoryKey(left))) -
+        Number(historyKeySet.has(createLeadHistoryKey(right)));
+      if (noveltyDifference !== 0) {
+        return noveltyDifference;
+      }
+
+      const strengthDifference =
+        strengthScore(right.leadStrength) - strengthScore(left.leadStrength);
       if (strengthDifference !== 0) {
         return strengthDifference;
       }
 
-      return (right.matchedJobs?.length || 0) - (left.matchedJobs?.length || 0);
+      const matchedJobsDifference =
+        (right.matchedJobs?.length || 0) - (left.matchedJobs?.length || 0);
+      if (matchedJobsDifference !== 0) {
+        return matchedJobsDifference;
+      }
+
+      return getSortKey(right.retrievedAt).localeCompare(getSortKey(left.retrievedAt));
     })
     .slice(0, Number.isFinite(leadLimit) ? leadLimit : 10)
     .map((lead, index) => ({
       ...lead,
+      isHistoricalDuplicate: historyKeySet.has(createLeadHistoryKey(lead)),
       rank: index + 1,
     }));
+
+  const newLeadCount = leads.filter((lead) => !lead.isHistoricalDuplicate).length;
 
   const mergedPayload = {
     updatedAt: getShanghaiUpdatedAt(),
@@ -267,6 +313,9 @@ async function main() {
       platformLimit: Number.isFinite(platformLimit) ? platformLimit : 3,
       leadLimit: Number.isFinite(leadLimit) ? leadLimit : 10,
       selectedPlatforms,
+      historyAware: Boolean(historyPath),
+      newLeadCount,
+      duplicateLeadCount: leads.length - newLeadCount,
     },
     platformCoverage,
     leads,

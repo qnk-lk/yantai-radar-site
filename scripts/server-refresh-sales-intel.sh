@@ -133,6 +133,7 @@ IFS=','; selected_csv="${available_platforms[*]}"; unset IFS
 
 node "$PROJECT_ROOT/scripts/aggregate-recruitment-platforms.mjs" \
   --output "$AGGREGATE_OUTPUT" \
+  --history "$SALES_INTEL_HISTORY_OUTPUT" \
   --lead-limit "$LEAD_LIMIT" \
   --platform-limit "$PLATFORM_LIMIT" \
   --selected-platforms "$selected_csv" \

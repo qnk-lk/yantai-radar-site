@@ -5,6 +5,7 @@ PROJECT_ROOT="${PROJECT_ROOT:-/home/ubuntu/yantai-radar-site}"
 LOG_FILE="${LOG_FILE:-/home/ubuntu/openclaw-bridge/recruitment-platforms.log}"
 PLATFORM_LIMIT="${PLATFORM_LIMIT:-3}"
 LEAD_LIMIT="${LEAD_LIMIT:-10}"
+PLATFORM_CANDIDATE_LIMIT="${PLATFORM_CANDIDATE_LIMIT:-8}"
 KEYWORDS="${KEYWORDS:-MES,WMS,QMS,智能制造}"
 AGGREGATE_OUTPUT="${AGGREGATE_OUTPUT:-/var/www/qn-message.com/recruitment-leads-aggregate.json}"
 RADAR_LATEST_INPUT="${RADAR_LATEST_INPUT:-/var/www/qn-message.com/latest.json}"
@@ -31,27 +32,44 @@ PLATFORMS=(
 {
   echo "[$(timestamp)] recruitment dispatcher started"
   echo "platform limit: $PLATFORM_LIMIT"
+  echo "platform candidate limit: $PLATFORM_CANDIDATE_LIMIT"
   echo "lead limit: $LEAD_LIMIT"
 
-  mapfile -t SELECTED_PLATFORMS < <(printf '%s\n' "${PLATFORMS[@]}" | shuf | head -n "$PLATFORM_LIMIT")
+  mapfile -t SELECTED_PLATFORMS < <(printf '%s\n' "${PLATFORMS[@]}" | shuf)
 
   total_leads=0
   selected_names=()
   for index in "${!SELECTED_PLATFORMS[@]}"; do
-    entry="${SELECTED_PLATFORMS[$index]}"
-    IFS='|' read -r platform_name runner_script output_file <<<"$entry"
-    remaining=$((LEAD_LIMIT - total_leads))
-    platforms_left=$(( ${#SELECTED_PLATFORMS[@]} - index ))
-
-    if (( remaining <= 0 )); then
-      echo "lead limit reached before $platform_name"
+    if (( index >= PLATFORM_LIMIT && total_leads >= LEAD_LIMIT )); then
+      echo "lead limit reached after $index platform(s)"
       break
     fi
 
-    per_platform_limit=$(( (remaining + platforms_left - 1) / platforms_left ))
+    entry="${SELECTED_PLATFORMS[$index]}"
+    IFS='|' read -r platform_name runner_script output_file <<<"$entry"
+    remaining=$((LEAD_LIMIT - total_leads))
+    planned_platforms_left=$(( PLATFORM_LIMIT - index ))
 
-    echo "[$(timestamp)] running $platform_name with per-platform limit $per_platform_limit and remaining limit $remaining"
-    if SKIP_SALES_INTEL_SYNC=1 MAX_COMPANIES="$per_platform_limit" KEYWORDS="$KEYWORDS" bash "$runner_script"; then
+    if (( remaining <= 0 )); then
+      remaining=1
+    fi
+
+    if (( planned_platforms_left < 1 )); then
+      planned_platforms_left=1
+      echo "[$(timestamp)] fallback platform enabled because current total is below lead limit"
+    fi
+
+    per_platform_limit=$(( (remaining + planned_platforms_left - 1) / planned_platforms_left ))
+    candidate_limit="$per_platform_limit"
+    if (( candidate_limit < PLATFORM_CANDIDATE_LIMIT )); then
+      candidate_limit="$PLATFORM_CANDIDATE_LIMIT"
+    fi
+    if (( candidate_limit > LEAD_LIMIT )); then
+      candidate_limit="$LEAD_LIMIT"
+    fi
+
+    echo "[$(timestamp)] running $platform_name with candidate limit $candidate_limit and remaining target $remaining"
+    if SKIP_SALES_INTEL_SYNC=1 MAX_COMPANIES="$candidate_limit" KEYWORDS="$KEYWORDS" bash "$runner_script"; then
       if [[ -f "$output_file" ]]; then
         lead_count="$(read_lead_count "$output_file")"
       else
