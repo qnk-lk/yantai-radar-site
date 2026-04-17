@@ -747,14 +747,27 @@ function mergeHistoricalRecruitmentItem(previousItem, currentItem) {
   const hasMaterialChange = previousFingerprint !== mergedFingerprint || changeFlags.length > 0;
 
   if (!hasMaterialChange) {
+    const nextRetrievedAt =
+      sanitizeText(currentItem?.retrievedAt, 40) ||
+      sanitizeText(lastSeenAt, 40) ||
+      sanitizeText(previousItem?.retrievedAt, 40);
+
     return {
       ...previousItem,
+      retrievedAt: nextRetrievedAt,
       lastSeenAt,
       lastChangedAt:
         sanitizeText(previousItem?.lastChangedAt, 40) ||
         sanitizeText(previousItem?.retrievedAt, 40),
       historyFingerprint: previousFingerprint,
       changeFlags: Array.isArray(previousItem?.changeFlags) ? previousItem.changeFlags : [],
+      detailRows: applyDetailRowOverrides(previousItem.detailRows, [
+        ["检索时间", nextRetrievedAt],
+        ["来源平台", previousItem.sourceLabel],
+        ["时间", previousItem.publishedAt],
+        ["强度", previousItem.strength],
+        ["建议动作", previousItem.actionText],
+      ]),
     };
   }
 
