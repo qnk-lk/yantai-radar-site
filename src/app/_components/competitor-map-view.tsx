@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import L, { type DivIcon } from "leaflet";
@@ -29,6 +29,24 @@ type BaselineMarker = {
 
 const DEFAULT_CENTER: [number, number] = [35.8617, 104.1954];
 const DEFAULT_ZOOM = 5;
+const TILE_ERROR_THRESHOLD = 4;
+
+const TILE_SOURCES = [
+  {
+    key: "amap-road",
+    attribution:
+      '&copy; <a href="https://www.amap.com/" target="_blank" rel="noreferrer">Amap</a>',
+    url: "https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+    subdomains: ["1", "2", "3", "4"],
+  },
+  {
+    key: "osm",
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    subdomains: ["a", "b", "c"],
+  },
+] as const;
 
 const LIDAO_CITIC_TOWER_COORDINATES = {
   lat: 37.5635523,
@@ -107,6 +125,51 @@ function SelectedMarkerFollower({ marker }: { marker: CompanyMarker | null }) {
   return null;
 }
 
+function MapViewportRefresher() {
+  const map = useMap();
+
+  useEffect(() => {
+    let frameId = 0;
+    let followUpFrameId = 0;
+
+    const invalidate = () => {
+      map.invalidateSize({ pan: false, debounceMoveend: true });
+    };
+
+    frameId = window.requestAnimationFrame(() => {
+      invalidate();
+      followUpFrameId = window.requestAnimationFrame(invalidate);
+    });
+
+    const handleResize = () => invalidate();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        invalidate();
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => invalidate())
+        : null;
+
+    resizeObserver?.observe(map.getContainer());
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.cancelAnimationFrame(followUpFrameId);
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      resizeObserver?.disconnect();
+    };
+  }, [map]);
+
+  return null;
+}
+
 function MapInteractionTracker() {
   useMapEvents({
     click() {
@@ -115,6 +178,42 @@ function MapInteractionTracker() {
   });
 
   return null;
+}
+
+function ResilientTileLayer() {
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [, setErrorCount] = useState(0);
+  const source = TILE_SOURCES[sourceIndex] ?? TILE_SOURCES[0];
+
+  return (
+    <TileLayer
+      key={source.key}
+      attribution={source.attribution}
+      url={source.url}
+      subdomains={[...source.subdomains]}
+      eventHandlers={{
+        tileerror: () => {
+          setErrorCount((current) => {
+            const next = current + 1;
+
+            if (next >= TILE_ERROR_THRESHOLD && sourceIndex < TILE_SOURCES.length - 1) {
+              startTransition(() => {
+                setSourceIndex((currentIndex) =>
+                  Math.min(currentIndex + 1, TILE_SOURCES.length - 1)
+                );
+              });
+              return 0;
+            }
+
+            return next;
+          });
+        },
+        load: () => {
+          setErrorCount(0);
+        },
+      }}
+    />
+  );
 }
 
 export function CompetitorMapView({
@@ -149,12 +248,10 @@ export function CompetitorMapView({
       className="competitor-leaflet-map"
       preferCanvas={false}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <ResilientTileLayer />
 
       <MapInteractionTracker />
+      <MapViewportRefresher />
       <SelectedMarkerFollower marker={selectedMarker} />
 
       <Marker position={[baselineMarker.lat, baselineMarker.lon]} icon={createBaselineIcon()}>

@@ -16,6 +16,56 @@
     "language": "语言",
     "default_location": "烟台开发区"
   },
+  "navigation": {
+    "label": "主导航",
+    "items": {
+      "overview": "总览",
+      "leads": "线索中心",
+      "companies": "企业库",
+      "competitors": "同行监测",
+      "follow_ups": "跟进管理",
+      "sources": "数据源"
+    }
+  },
+  "views": {
+    "note_title": "栏目说明",
+    "overview": {
+      "eyebrow": "总览",
+      "title": "今日销售与市场动态总览",
+      "description": "先看今天最重要的重点信息、线索变化和同行分布，再决定下一步进入哪个栏目。",
+      "note": "这一页只负责汇总和分流，不承载全部细节。重点是帮助你快速判断今天优先看线索、企业还是同行。"
+    },
+    "leads": {
+      "eyebrow": "线索中心",
+      "title": "统一查看所有销售线索",
+      "description": "把日报、招聘与平台信号统一放到一套线索池里，按时间和内容强度快速筛选。",
+      "note": "这页以单条线索为单位，适合先看有什么，再决定是否进入企业库做公司级判断。"
+    },
+    "companies": {
+      "eyebrow": "企业库",
+      "title": "按公司归拢历史信号",
+      "description": "把分散的招聘、日报和平台信号按企业聚合，方便你判断同一家公司最近是否持续出现动作。",
+      "note": "这页以公司为单位，不再按单条信息分散查看。后面跟进记录和阶段沉淀也应挂在这里。"
+    },
+    "competitors": {
+      "eyebrow": "同行监测",
+      "title": "查看区域同行分布与画像",
+      "description": "地图负责空间感，同行卡片负责服务方向和证据细节，用来判断区域格局和竞争环境。",
+      "note": "同行模块和销售线索要分开看。这里主要服务于市场判断，不直接承担客户跟进。"
+    },
+    "follow_ups": {
+      "eyebrow": "跟进管理",
+      "title": "后续沉淀销售动作与阶段",
+      "description": "当前先放一版建议跟进对象，后续会承接负责人、沟通记录、阶段、提醒和结果。",
+      "note": "这页现在还是过渡页，用来提前占住销售动作闭环的位置，避免系统一直停留在情报层。"
+    },
+    "sources": {
+      "eyebrow": "数据源",
+      "title": "查看后台链路与同步状态",
+      "description": "集中看日报、招聘聚合、同行和当日检索项的更新时间，便于快速判断哪条链路出了问题。",
+      "note": "这页面向你自己和运维，不是业务使用页。后面如果要做手动触发和日志查看，也应放在这里。"
+    }
+  },
   "metrics": {
     "sales_total": "销售总表",
     "sales_total_detail": "统一汇总日报和招聘后的有效销售信息数量。",
@@ -90,6 +140,7 @@
     "view": "查看",
     "close": "关闭弹窗",
     "detail": "详情",
+    "detail_loading": "正在加载详情...",
     "jobs": "关联岗位",
     "all_jobs": "该公司全部职业",
     "job_detail": "岗位详情",
@@ -105,6 +156,42 @@
     },
     "empty_feed": "当前还没有写入统一销售信息总表，等待日报和招聘聚合结果同步。",
     "empty_today": "当前还没有同步到今日十条招聘重点信息。"
+  },
+  "overview": {
+    "preview_title": "最近新增线索预览",
+    "open_leads": "进入线索中心"
+  },
+  "companies": {
+    "title": "企业信号聚合视图",
+    "search_placeholder": "搜索公司、城市或来源平台",
+    "strongest_signal": "最高强度 {{value}}",
+    "signal_count": "{{count}} 条信号",
+    "signal_metric": "累计信号",
+    "platform_metric": "来源平台",
+    "job_metric": "关联岗位",
+    "recent_signals": "最近命中的信号",
+    "empty": "当前还没有可聚合到企业库的数据。",
+    "unknown_city": "未知地区"
+  },
+  "follow_ups": {
+    "title": "建议优先纳入跟进的企业",
+    "description": "当前先依据最近检索和聚合结果给出建议跟进对象，后续再接阶段、负责人、提醒和记录。",
+    "empty_description": "当前还没有足够的数据生成建议跟进对象。"
+  },
+  "sources": {
+    "title": "数据源状态概览",
+    "description": "这里先看几条核心数据链路是否有更新，后面再继续补手动触发和错误日志。",
+    "cards": {
+      "report_title": "OpenClaw 日报",
+      "report_detail": "已同步 {{count}} 条日报类信息",
+      "recruitment_title": "招聘与平台聚合",
+      "recruitment_detail": "已同步 {{count}} 条招聘类信息",
+      "competitor_title": "同行链路",
+      "competitor_detail": "当前共有 {{count}} 家同行样本",
+      "search_title": "今日检索项",
+      "search_detail": "当前随机命中的检索项：{{value}}",
+      "search_empty": "当前还没有记录到今日检索项。"
+    }
   },
   "sections": {
     "priority_eyebrow": "高优线索",

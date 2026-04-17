@@ -30,7 +30,9 @@
     "recruitment:task:install": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-local-recruitment-task.ps1"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.1.1",
     "@fastify/cors": "^11.2.0",
+    "antd": "^6.3.5",
     "china-division": "2.7.0",
     "china-map-geojson": "1.0.4",
     "echarts": "6.0.0",

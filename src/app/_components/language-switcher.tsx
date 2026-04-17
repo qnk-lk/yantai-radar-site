@@ -1,21 +1,35 @@
 "use client";
 
 import Select, { components, type SingleValueProps } from "react-select";
-import ReactCountryFlag from "react-country-flag";
 
 import i18n, { languageOptions } from "./i18n";
 
 type LanguageOption = (typeof languageOptions)[number];
 
+const flagEmojiByCode: Record<string, string> = {
+  CN: "🇨🇳",
+  KR: "🇰🇷",
+  JP: "🇯🇵",
+  KP: "🇰🇵",
+  TH: "🇹🇭",
+  US: "🇺🇸",
+  GB: "🇬🇧",
+  FR: "🇫🇷",
+};
+
+function FlagEmoji({ countryCode }: { countryCode: string }) {
+  return (
+    <span aria-hidden="true" className="inline-flex w-[1.1em] justify-center text-[1.05em]">
+      {flagEmojiByCode[countryCode] ?? "🌐"}
+    </span>
+  );
+}
+
 function SingleValue(props: SingleValueProps<LanguageOption, false>) {
   return (
     <components.SingleValue {...props}>
       <span className="inline-flex items-center gap-2">
-        <ReactCountryFlag
-          countryCode={props.data.flag}
-          svg
-          style={{ width: "1.1em", height: "1.1em" }}
-        />
+        <FlagEmoji countryCode={props.data.flag} />
         <span>{props.data.label}</span>
       </span>
     </components.SingleValue>
@@ -65,11 +79,7 @@ export function LanguageSwitcher() {
         }}
         formatOptionLabel={(option) => (
           <span className="inline-flex items-center gap-2">
-            <ReactCountryFlag
-              countryCode={option.flag}
-              svg
-              style={{ width: "1.1em", height: "1.1em" }}
-            />
+            <FlagEmoji countryCode={option.flag} />
             <span>{option.label}</span>
           </span>
         )}

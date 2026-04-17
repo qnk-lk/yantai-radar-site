@@ -35,9 +35,9 @@ export type SalesIntelItem = {
   strength: string;
   actionText: string;
   tags: string[];
-  detailRows: SalesIntelDetailRow[];
-  evidence: SalesIntelEvidence[];
-  matchedJobs: SalesIntelMatchedJob[];
+  detailRows?: SalesIntelDetailRow[];
+  evidence?: SalesIntelEvidence[];
+  matchedJobs?: SalesIntelMatchedJob[];
   allJobs?: SalesIntelMatchedJob[];
 };
 

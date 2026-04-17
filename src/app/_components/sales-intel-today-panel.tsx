@@ -28,7 +28,7 @@ function isDisplayPublishedAt(value: string) {
 function getDisplayPublishedAt(item: SalesIntelItem) {
   const candidates = [
     item.publishedAt,
-    ...item.matchedJobs.map((job) => job.publishedAt),
+    ...(item.matchedJobs ?? []).map((job) => job.publishedAt),
   ]
     .map((value) => normalizePublishedAtCandidate(value))
     .filter(Boolean);
@@ -55,7 +55,7 @@ function deriveSearchItems(items: SalesIntelItem[]) {
         .split(/[、,，]/u)
         .map((value) => value.trim())
         .filter(Boolean),
-      ...item.matchedJobs.map((job) => String(job.platform || "").trim()).filter(Boolean),
+      ...(item.matchedJobs ?? []).map((job) => String(job.platform || "").trim()).filter(Boolean),
     ])
   ).slice(0, 3);
 }
@@ -152,7 +152,9 @@ export function SalesIntelTodayPanel({
 }) {
   const { t } = useTranslation();
   const [activeItem, setActiveItem] = useState<SalesIntelItem | null>(null);
-  const displaySearchItems = uniqueItems(searchItems || []).length
+  const hasTodayItems = items.length > 0;
+  const displayUpdatedAt = hasTodayItems ? updatedAt : "";
+  const displaySearchItems = hasTodayItems && uniqueItems(searchItems || []).length
     ? uniqueItems(searchItems || [])
     : deriveSearchItems(items);
 
@@ -169,9 +171,9 @@ export function SalesIntelTodayPanel({
                 <h2 className="text-2xl font-semibold tracking-tight text-(--color-ink) sm:text-3xl">
                   {t("sales_intel.today_title")}
                 </h2>
-                {updatedAt ? (
+                {displayUpdatedAt ? (
                   <span className="text-2xl font-semibold tracking-tight text-(--color-muted) sm:text-3xl">
-                    {formatDisplayUpdatedAt(updatedAt)}
+                    {formatDisplayUpdatedAt(displayUpdatedAt)}
                   </span>
                 ) : null}
                 {displaySearchItems.length ? (

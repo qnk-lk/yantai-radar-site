@@ -556,25 +556,61 @@ class CdpClient {
     this.nextId = 1;
     this.pending = new Map();
     this.ws = null;
+    this.targetId = "";
+  }
+
+  async createTarget(url = "about:blank") {
+    const endpoint = `${this.debugUrl}/json/new?${encodeURIComponent(url)}`;
+    let response = await fetch(endpoint, { method: "PUT" });
+
+    if (!response.ok) {
+      response = await fetch(endpoint);
+    }
+
+    if (!response.ok) {
+      throw new Error(`Chrome failed to create a temporary page target: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async closeTarget() {
+    if (!this.targetId) {
+      return;
+    }
+
+    const endpoint = `${this.debugUrl}/json/close/${this.targetId}`;
+    try {
+      let response = await fetch(endpoint, { method: "PUT" });
+      if (!response.ok) {
+        response = await fetch(endpoint);
+      }
+    } catch {
+      // Ignore close failures so the main run result is preserved.
+    } finally {
+      this.targetId = "";
+    }
   }
 
   async connect() {
-    const targets = await fetch(`${this.debugUrl}/json/list`).then((response) => {
+    const version = await fetch(`${this.debugUrl}/json/version`).then((response) => {
       if (!response.ok) {
         throw new Error(`Chrome debugging endpoint returned ${response.status}`);
       }
 
       return response.json();
     });
-    const target =
-      targets.find((item) => item.type === "page" && item.url.includes("xiaohongshu.com")) ||
-      targets.find((item) => item.type === "page");
-    if (!target?.webSocketDebuggerUrl) {
-      throw new Error(
-        "No Chrome page target found. Run pnpm xiaohongshu:browser first and keep that window open."
-      );
+
+    if (!version?.Browser) {
+      throw new Error("Chrome debugging endpoint is unavailable.");
     }
 
+    const target = await this.createTarget("about:blank");
+    if (!target?.webSocketDebuggerUrl) {
+      throw new Error("Chrome did not return a temporary page target.");
+    }
+
+    this.targetId = target.id || "";
     this.ws = new WebSocket(target.webSocketDebuggerUrl);
     this.ws.addEventListener("message", (event) => this.handleMessage(event));
 
@@ -584,6 +620,7 @@ class CdpClient {
         this.ws.addEventListener("error", reject, { once: true });
       });
     } catch (error) {
+      await this.closeTarget();
       throw error;
     }
   }
@@ -702,8 +739,12 @@ class CdpClient {
   }
 
   async dispose() {
-    this.ws?.close();
-    this.ws = null;
+    try {
+      this.ws?.close();
+    } finally {
+      this.ws = null;
+      await this.closeTarget();
+    }
   }
 }
 

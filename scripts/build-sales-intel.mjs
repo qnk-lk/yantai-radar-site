@@ -57,6 +57,45 @@ function getSortKey(value) {
   return match ? match.slice(1).join("") : "";
 }
 
+function getDateKey(value) {
+  const text = String(value || "");
+  const match = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+
+  const parsedDate = new Date(text);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsedDate);
+}
+
+function getTodayDateKey() {
+  if (process.env.SALES_INTEL_TODAY_DATE) {
+    return getDateKey(process.env.SALES_INTEL_TODAY_DATE);
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function isTodayDate(value) {
+  const dateKey = getDateKey(value);
+  return Boolean(dateKey && dateKey === getTodayDateKey());
+}
+
 function pickNewestTimestamp(...values) {
   const validValues = values.filter((value) => getSortKey(value));
   if (!validValues.length) {
@@ -869,7 +908,9 @@ async function main() {
     existingSalesIntelPayload,
     currentRecruitmentItems
   );
-  const todayHighlights = filterExcludedEntities(currentRecruitmentItems).slice(0, 10);
+  const todayHighlights = isTodayDate(recruitmentPayload?.updatedAt)
+    ? filterExcludedEntities(currentRecruitmentItems).slice(0, 10)
+    : [];
   const updatedAt =
     pickNewestTimestamp(radarPayload?.updatedAt, recruitmentPayload?.updatedAt) ||
     sanitizeText(radarPayload?.updatedAt || recruitmentPayload?.updatedAt || "等待首次统一同步");

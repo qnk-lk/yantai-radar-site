@@ -6,6 +6,11 @@ import { useTranslation } from "react-i18next";
 import type { SalesIntelItem } from "./sales-intel-types";
 
 const TAG_DETAIL_LABELS = new Set(["分类", "检索时间", "线索类型", "强度", "城市", "来源平台"]);
+type SalesIntelJob = NonNullable<SalesIntelItem["matchedJobs"]>[number];
+
+function buildSalesIntelDetailUrl(itemId: string) {
+  return `/api/sales/intel/items/${itemId}`;
+}
 
 function CloseIcon() {
   return (
@@ -21,7 +26,7 @@ function CloseIcon() {
   );
 }
 
-function buildJobHeadline(item: SalesIntelItem["matchedJobs"][number]) {
+function buildJobHeadline(item: SalesIntelJob) {
   return [item.jobTitle, item.platform, item.city, item.salary, item.publishedAt]
     .filter(Boolean)
     .join(" · ");
@@ -34,7 +39,7 @@ function JobContentModal({
   closeLabel,
   onClose,
 }: {
-  job: SalesIntelItem["matchedJobs"][number] | null;
+  job: SalesIntelJob | null;
   title: string;
   openSourceLabel: string;
   closeLabel: string;
@@ -106,12 +111,12 @@ function JobList({
   detailTitle,
   onViewContent,
 }: {
-  jobs: SalesIntelItem["matchedJobs"];
+  jobs: SalesIntelJob[];
   emptyLabel: string;
   openSourceLabel: string;
   viewLabel: string;
   detailTitle: string;
-  onViewContent: (job: SalesIntelItem["matchedJobs"][number]) => void;
+  onViewContent: (job: SalesIntelJob) => void;
 }) {
   return (
     <div className="grid gap-3">
@@ -185,10 +190,12 @@ export function SalesIntelDetailModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [activeJob, setActiveJob] = useState<SalesIntelItem["matchedJobs"][number] | null>(null);
+  const [activeJob, setActiveJob] = useState<SalesIntelJob | null>(null);
+  const [detailItem, setDetailItem] = useState<SalesIntelItem | null>(null);
 
   function handleClose() {
     setActiveJob(null);
+    setDetailItem(null);
     onClose();
   }
 
@@ -219,21 +226,72 @@ export function SalesIntelDetailModal({
     };
   }, [activeJob, item, onClose]);
 
+  useEffect(() => {
+    if (!item || (item.detailRows && item.matchedJobs)) {
+      return;
+    }
+
+    if (detailItem?.id === item.id) {
+      return;
+    }
+
+    let active = true;
+
+    fetch(buildSalesIntelDetailUrl(item.id), { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load detail: ${response.status}`);
+        }
+
+        return (await response.json()) as SalesIntelItem;
+      })
+      .then((payload) => {
+        if (!active) {
+          return;
+        }
+
+        setDetailItem(payload);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+
+        setDetailItem({
+          ...item,
+          detailRows: [],
+          evidence: [],
+          matchedJobs: [],
+          allJobs: [],
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [detailItem?.id, item]);
+
   if (!item) {
     return null;
   }
 
-  const relatedJobs = item.matchedJobs.slice(0, 3);
-  const allJobs = item.allJobs?.length ? item.allJobs : item.matchedJobs;
-  const detailTagRows = item.detailRows.filter((row) => TAG_DETAIL_LABELS.has(row.label));
-  const remainingDetailRows = item.detailRows.filter((row) => !TAG_DETAIL_LABELS.has(row.label));
+  const resolvedItem = item.detailRows && item.matchedJobs ? item : detailItem ?? item;
+  const isLoadingDetail = Boolean(item && !(item.detailRows && item.matchedJobs) && detailItem?.id !== item.id);
+  const relatedJobs = (resolvedItem.matchedJobs ?? []).slice(0, 3);
+  const allJobs =
+    resolvedItem.allJobs && resolvedItem.allJobs.length
+      ? resolvedItem.allJobs
+      : (resolvedItem.matchedJobs ?? []);
+  const detailRows = resolvedItem.detailRows ?? [];
+  const detailTagRows = detailRows.filter((row) => TAG_DETAIL_LABELS.has(row.label));
+  const remainingDetailRows = detailRows.filter((row) => !TAG_DETAIL_LABELS.has(row.label));
   const detailTagList = detailTagRows.length
     ? detailTagRows
     : [
-        ["分类", item.category],
-        ["强度", item.strength],
-        ["城市", item.location],
-        ["来源平台", item.sourceLabel],
+        ["分类", resolvedItem.category],
+        ["强度", resolvedItem.strength],
+        ["城市", resolvedItem.location],
+        ["来源平台", resolvedItem.sourceLabel],
       ]
         .map(([label, value]) => ({ label, value }))
         .filter((row) => row.value);
@@ -251,7 +309,7 @@ export function SalesIntelDetailModal({
           <div className="space-y-3">
             <div className="space-y-2">
               <h3 className="text-2xl font-semibold leading-tight text-(--color-ink) sm:text-3xl">
-                {item.title}
+                {resolvedItem.title}
               </h3>
               {detailTagList.length ? (
                 <div className="flex flex-wrap gap-2">
@@ -283,10 +341,16 @@ export function SalesIntelDetailModal({
 
         <div className="mt-6 space-y-6">
           <div className="rounded-[1.5rem] border border-(--color-line) bg-white/70 px-5 py-5 text-sm leading-8 text-(--color-ink)/85">
-            {item.summary}
+            {resolvedItem.summary}
           </div>
 
-          {remainingDetailRows.length ? (
+          {isLoadingDetail ? (
+            <div className="rounded-[1.35rem] border border-(--color-line) bg-white/72 px-4 py-6 text-sm leading-7 text-(--color-muted)">
+              {t("sales_intel.detail_loading")}
+            </div>
+          ) : null}
+
+          {!isLoadingDetail && remainingDetailRows.length ? (
             <DetailSection title={t("sales_intel.detail")}>
               <dl className="grid gap-3 sm:grid-cols-2">
                 {remainingDetailRows.map((row) => (
@@ -304,7 +368,7 @@ export function SalesIntelDetailModal({
             </DetailSection>
           ) : null}
 
-          {relatedJobs.length ? (
+          {!isLoadingDetail && relatedJobs.length ? (
             <DetailSection title={t("sales_intel.jobs")}>
               <JobList
                 jobs={relatedJobs}
@@ -317,7 +381,7 @@ export function SalesIntelDetailModal({
             </DetailSection>
           ) : null}
 
-          {allJobs.length ? (
+          {!isLoadingDetail && allJobs.length ? (
             <DetailSection title={t("sales_intel.all_jobs")}>
               <JobList
                 jobs={allJobs}

@@ -20,32 +20,79 @@ type WeatherState = {
   city: string;
   timezone: string;
   temperature: number | null;
-  weatherCode: number | null;
+  condition: string | null;
+  reportTime: string;
 };
 
 const defaultWeather: WeatherState = {
-  city: "烟台开发区",
+  city: "",
   timezone: "Asia/Shanghai",
   temperature: null,
-  weatherCode: null,
+  condition: null,
+  reportTime: "",
 };
+const WEATHER_REQUEST_TIMEOUT_MS = 3000;
+const WEATHER_DEFER_DELAY_MS = 1200;
 
-function getWeatherIcon(code: number | null) {
-  if (code === null) return "cloud";
-  if (code === 0) return "sun";
-  if ([1, 2].includes(code)) return "sun-cloud";
-  if (code === 3) return "cloudy";
-  if ([45, 48].includes(code)) return "fog";
-  if ([51, 53, 55, 56, 57, 61, 63, 65].includes(code)) return "rain";
-  if ([66, 67, 80, 81, 82].includes(code)) return "showers";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "snow";
-  if ([95, 96, 99].includes(code)) return "thunder";
+function getAbortSignal(timeoutMs: number) {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(timeoutMs);
+  }
+
+  return undefined;
+}
+
+function buildTopbarContextUrl(latitude?: number, longitude?: number) {
+  const url = new URL("/api/topbar/context", window.location.origin);
+
+  if (typeof latitude === "number" && typeof longitude === "number") {
+    url.searchParams.set("latitude", latitude.toString());
+    url.searchParams.set("longitude", longitude.toString());
+  }
+
+  return url.toString();
+}
+
+async function loadWeatherSnapshot(latitude?: number, longitude?: number): Promise<WeatherState> {
+  const response = await fetch(buildTopbarContextUrl(latitude, longitude), {
+    cache: "no-store",
+    signal: getAbortSignal(WEATHER_REQUEST_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Weather API failed: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as Partial<WeatherState>;
+
+  return {
+    city: typeof payload.city === "string" ? payload.city : "",
+    timezone: typeof payload.timezone === "string" ? payload.timezone : defaultWeather.timezone,
+    temperature:
+      typeof payload.temperature === "number" && Number.isFinite(payload.temperature)
+        ? payload.temperature
+        : null,
+    condition: typeof payload.condition === "string" ? payload.condition : null,
+    reportTime: typeof payload.reportTime === "string" ? payload.reportTime : "",
+  };
+}
+
+function getWeatherIcon(condition: string | null) {
+  if (!condition) return "cloud";
+  if (condition.includes("雷")) return "thunder";
+  if (condition.includes("雪") || condition.includes("冰雹")) return "snow";
+  if (condition.includes("阵雨") || condition.includes("暴雨")) return "showers";
+  if (condition.includes("雨")) return "rain";
+  if (condition.includes("雾") || condition.includes("霾")) return "fog";
+  if (condition.includes("多云")) return "sun-cloud";
+  if (condition.includes("阴")) return "cloudy";
+  if (condition.includes("晴")) return "sun";
   return "night-cloud";
 }
 
-function WeatherStatusIcon({ code }: { code: number | null }) {
+function WeatherStatusIcon({ condition }: { condition: string | null }) {
   const className = "text-3xl text-(--color-accent)";
-  const iconType = getWeatherIcon(code);
+  const iconType = getWeatherIcon(condition);
 
   switch (iconType) {
     case "sun":
@@ -73,127 +120,111 @@ function WeatherStatusIcon({ code }: { code: number | null }) {
 
 export function LocationWeatherClock() {
   const { t } = useTranslation();
-  const [status, setStatus] = useState<"locating" | "ready" | "denied" | "weather-error">(
-    "locating"
-  );
+  const [status, setStatus] = useState<"locating" | "ready" | "weather-error">("locating");
   const [weather, setWeather] = useState<WeatherState>(defaultWeather);
 
   useEffect(() => {
     let active = true;
+    let deferredTimer = 0;
 
-    async function loadWeather(position: GeolocationPosition) {
-      const { latitude, longitude } = position.coords;
-
-      try {
-        const [weatherResponse, reverseResponse] = await Promise.all([
-          fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`,
-            { cache: "no-store" }
-          ),
-          fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=10`,
-            { cache: "no-store" }
-          ),
-        ]);
-
-        if (!active) {
-          return;
-        }
-
-        const weatherJson = await weatherResponse.json();
-        const reverseJson = await reverseResponse.json();
-
-        const address = reverseJson.address ?? {};
-        const city =
-          address.city ??
-          address.town ??
-          address.county ??
-          address.state_district ??
-          t("topbar.default_location");
-
-        setWeather({
-          city,
-          timezone: weatherJson.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-          temperature: weatherJson.current?.temperature_2m ?? null,
-          weatherCode: weatherJson.current?.weather_code ?? null,
-        });
-        setStatus("ready");
-      } catch {
-        if (!active) {
-          return;
-        }
-
-        setStatus("weather-error");
-      }
+    function applyWeather(snapshot: WeatherState) {
+      setWeather(snapshot);
+      setStatus(snapshot.temperature === null && !snapshot.condition ? "weather-error" : "ready");
     }
 
-    if (!navigator.geolocation) {
-      const missingGeolocationTimer = window.setTimeout(() => {
+    async function loadDefaultWeather() {
+      try {
+        const snapshot = await loadWeatherSnapshot();
+
+        if (!active) {
+          return;
+        }
+
+        applyWeather(snapshot);
+      } catch {
         if (active) {
           setStatus("weather-error");
         }
-      }, 0);
+      }
+    }
 
+    async function loadPreciseWeather(position: GeolocationPosition) {
+      const { latitude, longitude } = position.coords;
+
+      try {
+        const snapshot = await loadWeatherSnapshot(latitude, longitude);
+
+        if (!active) {
+          return;
+        }
+
+        applyWeather(snapshot);
+      } catch {
+        if (active) {
+          setStatus((current) => (current === "ready" ? current : "weather-error"));
+        }
+      }
+    }
+
+    loadDefaultWeather().catch(() => {
+      if (active) {
+        setStatus("weather-error");
+      }
+    });
+
+    if (!navigator.geolocation) {
       return () => {
         active = false;
-        window.clearTimeout(missingGeolocationTimer);
       };
     }
 
     const geolocation = navigator.geolocation;
 
-    if (!geolocation) {
-      return;
-    }
-
-    geolocation.getCurrentPosition(
-      (position) => {
-        loadWeather(position).catch(() => {
-          if (active) {
-            setStatus("weather-error");
-          }
-        });
-      },
-      () => {
-        if (active) {
-          setStatus("denied");
+    deferredTimer = window.setTimeout(() => {
+      geolocation.getCurrentPosition(
+        (position) => {
+          loadPreciseWeather(position).catch(() => {
+            if (active) {
+              setStatus((current) => (current === "ready" ? current : "weather-error"));
+            }
+          });
+        },
+        () => undefined,
+        {
+          enableHighAccuracy: false,
+          timeout: 6000,
+          maximumAge: 300000,
         }
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 300000,
-      }
-    );
+      );
+    }, WEATHER_DEFER_DELAY_MS);
 
     return () => {
       active = false;
+      window.clearTimeout(deferredTimer);
     };
-  }, [t]);
+  }, []);
 
   let statusText = t("topbar.locating");
 
-  if (status === "denied") {
-    statusText = "";
-  } else if (status === "weather-error") {
+  if (status === "weather-error") {
     statusText = t("topbar.weather_unavailable");
   } else if (status === "ready") {
     statusText =
       weather.temperature === null
-        ? t("topbar.weather_loading")
-        : `${Math.round(weather.temperature)}°C`;
+        ? weather.condition || t("topbar.weather_loading")
+        : `${Math.round(weather.temperature)}°C ${weather.condition ?? ""}`.trim();
   }
 
   return (
     <div className="flex w-full max-w-96 items-center rounded-[1.25rem]">
       <div className="min-w-0 space-y-1">
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-(--color-muted)">
-          {weather.city}
+          {weather.city || t("topbar.default_location")}
         </p>
       </div>
 
       <div className="flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-(--color-ink)">
-        <WeatherStatusIcon code={weather.weatherCode} />
+        <WeatherStatusIcon condition={weather.condition} />
         <span className="text-sm font-medium">{statusText}</span>
       </div>
     </div>

@@ -38,7 +38,7 @@ function isDisplayPublishedAt(value: string) {
 function getDisplayPublishedAt(item: SalesIntelItem) {
   const candidates = [
     item.publishedAt,
-    ...item.matchedJobs.map((job) => job.publishedAt),
+    ...(item.matchedJobs ?? []).map((job) => job.publishedAt),
   ]
     .map((value) => normalizePublishedAtCandidate(value))
     .filter(Boolean);
