@@ -54,6 +54,7 @@ jobs:
             --exclude latest.json \
             --exclude competitors.json \
             --exclude sales-intel.json \
+            --exclude sales-intel-history.json \
             --exclude recruitment-leads-status.json \
             --exclude 'recruitment-leads*.json' \
             --exclude 'social-signals*.json' \

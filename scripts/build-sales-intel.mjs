@@ -23,6 +23,18 @@ function readOption(argv, name) {
   return argv[index + 1] || "";
 }
 
+function resolveHistoryPath(outputPath, explicitHistoryPath) {
+  if (explicitHistoryPath) {
+    return explicitHistoryPath;
+  }
+
+  if (!outputPath) {
+    return "";
+  }
+
+  return path.join(path.dirname(outputPath), "sales-intel-history.json");
+}
+
 function compactText(value) {
   return String(value || "")
     .replace(/\s+/g, " ")
@@ -50,9 +62,7 @@ function createId(prefix, ...parts) {
 }
 
 function getSortKey(value) {
-  const match = String(value || "").match(
-    /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/
-  );
+  const match = String(value || "").match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
 
   return match ? match.slice(1).join("") : "";
 }
@@ -102,7 +112,9 @@ function pickNewestTimestamp(...values) {
     return "";
   }
 
-  return [...validValues].sort((left, right) => getSortKey(right).localeCompare(getSortKey(left)))[0];
+  return [...validValues].sort((left, right) =>
+    getSortKey(right).localeCompare(getSortKey(left))
+  )[0];
 }
 
 function createDetailRows(pairs) {
@@ -197,9 +209,10 @@ function mergeMatchedJobs(previousJobs, currentJobs) {
       salary: normalizedJob.salary || existingJob.salary,
       publishedAt: normalizedJob.publishedAt || existingJob.publishedAt,
       url: normalizedJob.url || existingJob.url,
-      keywordHits: uniqueStrings([...(existingJob.keywordHits || []), ...(normalizedJob.keywordHits || [])]).sort(
-        (left, right) => left.localeCompare(right, "zh-CN")
-      ),
+      keywordHits: uniqueStrings([
+        ...(existingJob.keywordHits || []),
+        ...(normalizedJob.keywordHits || []),
+      ]).sort((left, right) => left.localeCompare(right, "zh-CN")),
       descriptionEvidence: normalizedJob.descriptionEvidence || existingJob.descriptionEvidence,
     });
   }
@@ -672,7 +685,10 @@ function buildMergedRecruitmentCandidate(previousItem, currentItem) {
     compareTimestampDesc(previousItem?.retrievedAt, currentItem?.retrievedAt) > 0;
   const preferred = currentIsNewer ? currentItem : previousItem;
   const fallback = currentIsNewer ? previousItem : currentItem;
-  const matchedJobs = mergeMatchedJobs(previousItem?.matchedJobs || [], currentItem?.matchedJobs || []);
+  const matchedJobs = mergeMatchedJobs(
+    previousItem?.matchedJobs || [],
+    currentItem?.matchedJobs || []
+  );
   const allJobs = mergeMatchedJobs(
     previousItem?.allJobs || previousItem?.matchedJobs || [],
     currentItem?.allJobs || currentItem?.matchedJobs || []
@@ -728,8 +744,7 @@ function mergeHistoricalRecruitmentItem(previousItem, currentItem) {
     currentItem?.retrievedAt
   );
   const changeFlags = collectRecruitmentChangeFlags(previousItem, mergedCandidate);
-  const hasMaterialChange =
-    previousFingerprint !== mergedFingerprint || changeFlags.length > 0;
+  const hasMaterialChange = previousFingerprint !== mergedFingerprint || changeFlags.length > 0;
 
   if (!hasMaterialChange) {
     return {
@@ -739,9 +754,7 @@ function mergeHistoricalRecruitmentItem(previousItem, currentItem) {
         sanitizeText(previousItem?.lastChangedAt, 40) ||
         sanitizeText(previousItem?.retrievedAt, 40),
       historyFingerprint: previousFingerprint,
-      changeFlags: Array.isArray(previousItem?.changeFlags)
-        ? previousItem.changeFlags
-        : [],
+      changeFlags: Array.isArray(previousItem?.changeFlags) ? previousItem.changeFlags : [],
     };
   }
 
@@ -879,11 +892,8 @@ function buildSummary(radarPayload, recruitmentPayload, reportCount, recruitment
   return {
     focus,
     status:
-      statusParts.join(" ") ||
-      `当前已汇总 ${reportCount + recruitmentCount} 条销售相关信息。`,
-    note:
-      noteParts.join(" ") ||
-      "该面板会同时吸收 OpenClaw 日报和多平台聚合结果。",
+      statusParts.join(" ") || `当前已汇总 ${reportCount + recruitmentCount} 条销售相关信息。`,
+    note: noteParts.join(" ") || "该面板会同时吸收 OpenClaw 日报和多平台聚合结果。",
   };
 }
 
@@ -892,20 +902,25 @@ async function main() {
   const outputPath = readOption(argv, "output");
   const radarPath = readOption(argv, "radar");
   const recruitmentPath = readOption(argv, "recruitment");
+  const historyPath = resolveHistoryPath(outputPath, readOption(argv, "history"));
 
   if (!outputPath) {
     throw new Error(
-      "Usage: node build-sales-intel.mjs --output <path> [--radar <path>] [--recruitment <path>]"
+      "Usage: node build-sales-intel.mjs --output <path> [--radar <path>] [--recruitment <path>] [--history <path>]"
     );
   }
 
   const radarPayload = await readJsonSafe(radarPath, {});
   const recruitmentPayload = await readJsonSafe(recruitmentPath, {});
+  const existingHistoryPayload = await readJsonSafe(historyPath, {});
   const existingSalesIntelPayload = await readJsonSafe(outputPath, {});
+  const historicalSourcePayload = Array.isArray(existingHistoryPayload?.feed)
+    ? existingHistoryPayload
+    : existingSalesIntelPayload;
   const reportItems = buildReportItems(radarPayload);
   const currentRecruitmentItems = sortSalesIntelItems(buildRecruitmentItems(recruitmentPayload));
   const recruitmentItems = buildHistoricalRecruitmentItems(
-    existingSalesIntelPayload,
+    historicalSourcePayload,
     currentRecruitmentItems
   );
   const todayHighlights = isTodayDate(recruitmentPayload?.updatedAt)
@@ -948,6 +963,10 @@ async function main() {
 
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  if (historyPath && path.resolve(historyPath) !== path.resolve(outputPath)) {
+    await fs.mkdir(path.dirname(historyPath), { recursive: true });
+    await fs.writeFile(historyPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  }
   console.log(`Built ${payload.feed.length} sales intel items at ${outputPath}`);
 }
 

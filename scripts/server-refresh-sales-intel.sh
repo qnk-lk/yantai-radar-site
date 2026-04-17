@@ -6,6 +6,7 @@ SITE_ROOT="${SITE_ROOT:-/var/www/qn-message.com}"
 RADAR_INPUT="${RADAR_INPUT:-$SITE_ROOT/latest.json}"
 AGGREGATE_OUTPUT="${AGGREGATE_OUTPUT:-$SITE_ROOT/recruitment-leads-aggregate.json}"
 SALES_INTEL_OUTPUT="${SALES_INTEL_OUTPUT:-$SITE_ROOT/sales-intel.json}"
+SALES_INTEL_HISTORY_OUTPUT="${SALES_INTEL_HISTORY_OUTPUT:-$SITE_ROOT/sales-intel-history.json}"
 LEAD_LIMIT="${LEAD_LIMIT:-10}"
 PLATFORM_LIMIT="${PLATFORM_LIMIT:-3}"
 SET_SELECTED_PLATFORMS="${SET_SELECTED_PLATFORMS:-}"
@@ -122,6 +123,12 @@ if [[ ${#aggregate_args[@]} -eq 0 ]]; then
   exit 0
 fi
 
+if [[ ! -f "$SALES_INTEL_HISTORY_OUTPUT" ]]; then
+  node "$PROJECT_ROOT/server/export-document.mjs" \
+    --key salesIntelHistory \
+    --output "$SALES_INTEL_HISTORY_OUTPUT" >/dev/null || true
+fi
+
 IFS=','; selected_csv="${available_platforms[*]}"; unset IFS
 
 node "$PROJECT_ROOT/scripts/aggregate-recruitment-platforms.mjs" \
@@ -139,9 +146,15 @@ node "$PROJECT_ROOT/server/import-document.mjs" \
 node "$PROJECT_ROOT/scripts/build-sales-intel.mjs" \
   --radar "$RADAR_INPUT" \
   --recruitment "$AGGREGATE_OUTPUT" \
-  --output "$SALES_INTEL_OUTPUT"
+  --output "$SALES_INTEL_OUTPUT" \
+  --history "$SALES_INTEL_HISTORY_OUTPUT"
 
 node "$PROJECT_ROOT/server/import-document.mjs" \
   --key salesIntel \
   --input "$SALES_INTEL_OUTPUT" \
   --source "sales-intel-sync"
+
+node "$PROJECT_ROOT/server/import-document.mjs" \
+  --key salesIntelHistory \
+  --input "$SALES_INTEL_HISTORY_OUTPUT" \
+  --source "sales-intel-history"

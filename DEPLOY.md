@@ -247,7 +247,15 @@ After building locally, you can publish the static export with:
 
 ```bash
 pnpm build
-rsync -avz --delete --exclude latest.json -e "ssh -p 22" out/ ubuntu@129.226.217.104:/var/www/qn-message.com/
+rsync -avz --delete \
+  --exclude latest.json \
+  --exclude competitors.json \
+  --exclude sales-intel.json \
+  --exclude sales-intel-history.json \
+  --exclude recruitment-leads-status.json \
+  --exclude 'recruitment-leads*.json' \
+  --exclude 'social-signals*.json' \
+  -e "ssh -p 22" out/ ubuntu@129.226.217.104:/var/www/qn-message.com/
 ```
 
 Also sync the static JSON files that the backend will read:
