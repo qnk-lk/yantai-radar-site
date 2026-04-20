@@ -267,29 +267,43 @@ export function CompetitorMapView({
         </Tooltip>
       </Marker>
 
-      {markers.map((marker) => (
-        <Marker
-          key={marker.key}
-          position={[marker.lat, marker.lon]}
-          icon={createCompanyIcon(marker.key === selectedKey)}
-          eventHandlers={{
-            click: () => onSelect(marker.key),
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -10]} opacity={1} className="competitor-map-tooltip">
-            <span>
-              {t("map.competitor_tooltip", {
-                name: marker.company.companyName,
-                city: formatAdminName(marker.company.city, i18n.resolvedLanguage),
-                fit:
-                  getServiceFitLevel(marker.company.serviceFit) !== null
-                    ? t(`deck.fit_levels.${getServiceFitLevel(marker.company.serviceFit)}`)
-                    : marker.company.serviceFit,
-              })}
-            </span>
-          </Tooltip>
-        </Marker>
-      ))}
+      {markers.map((marker) => {
+        const fitLevel = getServiceFitLevel(marker.company.serviceFit);
+        const fitLabel =
+          fitLevel === "high"
+            ? t("deck.fit_levels.high")
+            : fitLevel === "medium"
+              ? t("deck.fit_levels.medium")
+              : fitLevel === "low"
+                ? t("deck.fit_levels.low")
+                : marker.company.serviceFit;
+
+        return (
+          <Marker
+            key={marker.key}
+            position={[marker.lat, marker.lon]}
+            icon={createCompanyIcon(marker.key === selectedKey)}
+            eventHandlers={{
+              click: () => onSelect(marker.key),
+            }}
+          >
+            <Tooltip
+              direction="top"
+              offset={[0, -10]}
+              opacity={1}
+              className="competitor-map-tooltip"
+            >
+              <span>
+                {t("map.competitor_tooltip", {
+                  name: marker.company.companyName,
+                  city: formatAdminName(marker.company.city, i18n.resolvedLanguage),
+                  fit: fitLabel,
+                })}
+              </span>
+            </Tooltip>
+          </Marker>
+        );
+      })}
     </MapContainer>
   );
 }

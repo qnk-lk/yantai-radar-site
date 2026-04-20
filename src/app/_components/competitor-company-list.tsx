@@ -168,6 +168,15 @@ export function CompetitorCompanyList({
                 {scrollingCompanies.map(({ company, loop, index }) => {
                   const key = getCompetitorKey(company);
                   const isOpen = selectedKey === key && loop === 0;
+                  const fitLevel = getServiceFitLevel(company.serviceFit);
+                  const fitLabel =
+                    fitLevel === "high"
+                      ? t("deck.fit_levels.high")
+                      : fitLevel === "medium"
+                        ? t("deck.fit_levels.medium")
+                        : fitLevel === "low"
+                          ? t("deck.fit_levels.low")
+                          : company.serviceFit;
 
                   return (
                     <article
@@ -190,10 +199,7 @@ export function CompetitorCompanyList({
                             </span>
                             <span className="rounded-full border border-(--color-line) px-3 py-1 text-xs text-(--color-muted)">
                               {t("deck.service_fit", {
-                                fit:
-                                  getServiceFitLevel(company.serviceFit) !== null
-                                    ? t(`deck.fit_levels.${getServiceFitLevel(company.serviceFit)}`)
-                                    : company.serviceFit,
+                                fit: fitLabel,
                               })}
                             </span>
                           </div>

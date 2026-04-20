@@ -159,19 +159,70 @@
   },
   "overview": {
     "preview_title": "最近新增线索预览",
-    "open_leads": "进入线索中心"
+    "open_leads": "进入线索中心",
+    "open_companies": "进入企业库",
+    "open_competitors": "进入同行监测",
+    "open_sources": "查看数据源",
+    "status": {
+      "title": "后台链路状态",
+      "report": "OpenClaw 日报",
+      "recruitment": "招聘与平台聚合",
+      "competitor": "同行链路",
+      "synced": "已同步",
+      "waiting": "等待同步"
+    },
+    "quick": {
+      "title": "下一步入口",
+      "leads_title": "今日重点",
+      "leads_description": "先看当天聚合出的重点信息，再进入线索中心查看完整列表。",
+      "companies_title": "企业判断",
+      "companies_description": "把分散信号按公司归拢，判断哪些企业值得持续跟进。",
+      "competitors_title": "同行态势",
+      "competitors_description": "查看区域内服务制造业公司的分布、匹配度和证据。"
+    },
+    "company_snapshot": {
+      "title": "企业信号摘要"
+    },
+    "competitor_snapshot": {
+      "title": "同行态势摘要"
+    }
   },
   "companies": {
     "title": "企业信号聚合视图",
+    "index_title": "企业索引",
+    "index_description": "按公司归拢日报、招聘和平台信号，先看哪些企业正在持续出现动作。",
     "search_placeholder": "搜索公司、城市或来源平台",
     "strongest_signal": "最高强度 {{value}}",
     "signal_count": "{{count}} 条信号",
     "signal_metric": "累计信号",
     "platform_metric": "来源平台",
     "job_metric": "关联岗位",
+    "total_companies_metric": "企业数量",
+    "total_signals_metric": "累计信号",
+    "total_jobs_metric": "岗位线索",
     "recent_signals": "最近命中的信号",
     "empty": "当前还没有可聚合到企业库的数据。",
-    "unknown_city": "未知地区"
+    "unknown_city": "未知地区",
+    "profile": {
+      "subtitle": "基于当前已沉淀的销售线索自动形成的企业档案首版，后续可继续接跟进状态和主档案。",
+      "summary_title": "企业判断摘要",
+      "summary_empty": "当前还没有足够摘要信息。",
+      "source_title": "来源平台",
+      "followup_title": "跟进预留",
+      "stage_label": "当前阶段",
+      "owner_label": "负责人",
+      "owner_empty": "暂未分配",
+      "next_action_label": "建议动作",
+      "next_action_empty": "等待后续跟进规则接入。",
+      "job_preview_title": "关联岗位与需求",
+      "job_empty": "当前没有关联岗位数据。",
+      "no_strength": "暂无强度",
+      "stages": {
+        "priority": "优先评估",
+        "watch": "持续观察",
+        "screening": "初筛观察"
+      }
+    }
   },
   "follow_ups": {
     "title": "建议优先纳入跟进的企业",

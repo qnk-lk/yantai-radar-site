@@ -1,6 +1,13 @@
 "use client";
 
-import { AppstoreOutlined, DatabaseOutlined, DeploymentUnitOutlined, NodeIndexOutlined, RadarChartOutlined, ScheduleOutlined } from "@ant-design/icons";
+import {
+  AppstoreOutlined,
+  DatabaseOutlined,
+  DeploymentUnitOutlined,
+  NodeIndexOutlined,
+  RadarChartOutlined,
+  ScheduleOutlined,
+} from "@ant-design/icons";
 import { Menu } from "antd";
 import type { MenuProps } from "antd";
 import Link from "next/link";
@@ -58,7 +65,7 @@ export function RadarTopNavigation() {
   );
 
   return (
-    <div className="rounded-[1.6rem] border border-(--color-line) bg-white/85 px-2 py-2">
+    <div className="scrollbar-hidden max-w-full overflow-x-auto rounded-[1.6rem] border border-(--color-line) bg-white/85 px-2 py-2">
       <Menu
         mode="horizontal"
         selectedKeys={[resolveSelectedKey(pathname)]}
@@ -67,7 +74,8 @@ export function RadarTopNavigation() {
         style={{
           borderBottom: "none",
           background: "transparent",
-          minWidth: 0,
+          minWidth: "100%",
+          width: "max-content",
         }}
       />
     </div>

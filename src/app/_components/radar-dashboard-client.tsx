@@ -3,26 +3,40 @@
 import {
   AlertOutlined,
   ApartmentOutlined,
+  ArrowRightOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
   DatabaseOutlined,
   RadarChartOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Empty, Space, Statistic, Tag, Typography } from "antd";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./i18n";
-import { CompanyLibraryPanel, buildCompanyLibraryEntries } from "./company-library-panel";
+import {
+  CompanyLibraryPanel,
+  buildCompanyLibraryEntries,
+  type CompanyLibraryEntry,
+} from "./company-library-panel";
 import { CompetitorCityFilter, type SelectedCity } from "./competitor-city-filter";
 import { CompetitorCompanyList } from "./competitor-company-list";
 import { CompetitorMapPanel } from "./competitor-map-panel";
-import { getCompetitorKey, type ChinaAdminIndex, type CompetitorData } from "./competitor-types";
+import {
+  getCompetitorKey,
+  type ChinaAdminIndex,
+  type CompetitorCompany,
+  type CompetitorData,
+} from "./competitor-types";
 import { LanguageSwitcher } from "./language-switcher";
 import { LocationWeatherClock } from "./location-weather-clock";
 import { RadarTopNavigation } from "./radar-top-navigation";
 import { SalesIntelFeedPanel } from "./sales-intel-feed-panel";
 import { SalesIntelTodayPanel } from "./sales-intel-today-panel";
 import type { SalesIntelData, SalesIntelItem } from "./sales-intel-types";
+import { DashboardLoadingSkeleton } from "./dashboard-loading-skeleton";
 
 export type DashboardView =
   | "overview"
@@ -155,6 +169,282 @@ function OverviewLeadPreview({ items }: { items: SalesIntelItem[] }) {
   );
 }
 
+function OverviewActionCard({
+  icon,
+  title,
+  value,
+  description,
+  href,
+  actionLabel,
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string | number;
+  description: string;
+  href: string;
+  actionLabel: string;
+}) {
+  return (
+    <Card className="h-full overflow-hidden">
+      <div className="flex h-full flex-col justify-between gap-5">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-(--color-card-soft) text-lg text-(--color-accent)">
+              {icon}
+            </span>
+            <Typography.Text className="text-3xl font-semibold text-(--color-ink)">
+              {value}
+            </Typography.Text>
+          </div>
+          <div className="space-y-2">
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              {title}
+            </Typography.Title>
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              {description}
+            </Typography.Paragraph>
+          </div>
+        </div>
+
+        <Link href={href}>
+          <Button type="link" style={{ paddingInline: 0 }}>
+            {actionLabel} <ArrowRightOutlined />
+          </Button>
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
+function OverviewStatusPanel({
+  salesIntelData,
+  competitorData,
+}: {
+  salesIntelData: SalesIntelData;
+  competitorData: CompetitorData;
+}) {
+  const { t } = useTranslation();
+  const reportSource = salesIntelData.sourceBreakdown.find((item) => item.kind === "report");
+  const recruitmentSource = salesIntelData.sourceBreakdown.find(
+    (item) => item.kind === "recruitment"
+  );
+  const statusItems = [
+    {
+      title: t("overview.status.report"),
+      updatedAt: reportSource?.updatedAt ?? "",
+      detail: reportSource
+        ? t("sources.cards.report_detail", { count: reportSource.count })
+        : t("sales_intel.not_synced"),
+    },
+    {
+      title: t("overview.status.recruitment"),
+      updatedAt: recruitmentSource?.updatedAt ?? "",
+      detail: recruitmentSource
+        ? t("sources.cards.recruitment_detail", { count: recruitmentSource.count })
+        : t("sales_intel.not_synced"),
+    },
+    {
+      title: t("overview.status.competitor"),
+      updatedAt: competitorData.updatedAt,
+      detail: t("sources.cards.competitor_detail", {
+        count: competitorData.competitors.length,
+      }),
+    },
+  ];
+
+  return (
+    <Card
+      title={t("overview.status.title")}
+      extra={
+        <Link href="/sources">
+          <Button type="link">{t("overview.open_sources")}</Button>
+        </Link>
+      }
+    >
+      <div className="grid gap-3">
+        {statusItems.map((item) => {
+          const hasUpdatedAt = Boolean(item.updatedAt);
+
+          return (
+            <div
+              key={item.title}
+              className="rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) px-4 py-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <Space size={8}>
+                  {hasUpdatedAt ? (
+                    <CheckCircleOutlined className="text-(--color-accent)" />
+                  ) : (
+                    <ClockCircleOutlined className="text-(--color-muted)" />
+                  )}
+                  <Typography.Text strong>{item.title}</Typography.Text>
+                </Space>
+                <Tag color={hasUpdatedAt ? "green" : "default"}>
+                  {hasUpdatedAt ? t("overview.status.synced") : t("overview.status.waiting")}
+                </Tag>
+              </div>
+              <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                {item.updatedAt
+                  ? `${formatDisplayUpdatedAt(item.updatedAt)} · ${item.detail}`
+                  : item.detail}
+              </Typography.Paragraph>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function OverviewCompanySnapshot({ entries }: { entries: CompanyLibraryEntry[] }) {
+  const { t } = useTranslation();
+  const topEntries = entries.slice(0, 4);
+
+  return (
+    <Card
+      title={t("overview.company_snapshot.title")}
+      extra={
+        <Link href="/companies">
+          <Button type="link">{t("overview.open_companies")}</Button>
+        </Link>
+      }
+    >
+      {topEntries.length ? (
+        <div className="divide-y divide-(--color-line)">
+          {topEntries.map((entry) => (
+            <div key={entry.id} className="py-4 first:pt-0 last:pb-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 space-y-2">
+                  <Typography.Text strong>{entry.companyName}</Typography.Text>
+                  <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
+                    {entry.latestSummary}
+                  </Typography.Paragraph>
+                </div>
+                <Tag className="shrink-0">{entry.city || t("companies.unknown_city")}</Tag>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty description={t("companies.empty")} />
+      )}
+    </Card>
+  );
+}
+
+function OverviewCompetitorSnapshot({ companies }: { companies: CompetitorCompany[] }) {
+  const { t } = useTranslation();
+  const topCompanies = companies.slice(0, 4);
+
+  return (
+    <Card
+      title={t("overview.competitor_snapshot.title")}
+      extra={
+        <Link href="/competitors">
+          <Button type="link">{t("overview.open_competitors")}</Button>
+        </Link>
+      }
+    >
+      {topCompanies.length ? (
+        <div className="space-y-3">
+          {topCompanies.map((company) => (
+            <div
+              key={getCompetitorKey(company)}
+              className="rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) px-4 py-3"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag color="orange">#{company.rank}</Tag>
+                <Tag>{company.city}</Tag>
+                {company.serviceFit ? <Tag>{company.serviceFit}</Tag> : null}
+              </div>
+              <Typography.Text strong className="mt-2 block">
+                {company.companyName}
+              </Typography.Text>
+              <Typography.Paragraph
+                ellipsis={{ rows: 2 }}
+                style={{ marginTop: 6, marginBottom: 0 }}
+              >
+                {company.manufacturingFocus || company.whyRelevant}
+              </Typography.Paragraph>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty description={t("deck.empty_filtered")} />
+      )}
+    </Card>
+  );
+}
+
+function OverviewCommandCenter({
+  salesIntelData,
+  competitorData,
+  companyEntries,
+  visibleCompetitors,
+}: {
+  salesIntelData: SalesIntelData;
+  competitorData: CompetitorData;
+  companyEntries: CompanyLibraryEntry[];
+  visibleCompetitors: CompetitorCompany[];
+}) {
+  const { t } = useTranslation();
+  const quickCards = [
+    {
+      icon: <RadarChartOutlined />,
+      title: t("overview.quick.leads_title"),
+      value: salesIntelData.totals.todayHighlights,
+      description: t("overview.quick.leads_description"),
+      href: "/leads",
+      actionLabel: t("overview.open_leads"),
+    },
+    {
+      icon: <ApartmentOutlined />,
+      title: t("overview.quick.companies_title"),
+      value: companyEntries.length,
+      description: t("overview.quick.companies_description"),
+      href: "/companies",
+      actionLabel: t("overview.open_companies"),
+    },
+    {
+      icon: <TeamOutlined />,
+      title: t("overview.quick.competitors_title"),
+      value: visibleCompetitors.length,
+      description: t("overview.quick.competitors_description"),
+      href: "/competitors",
+      actionLabel: t("overview.open_competitors"),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.16fr)_minmax(20rem,0.84fr)]">
+        <SalesIntelTodayPanel
+          items={salesIntelData.todayHighlights}
+          updatedAt={salesIntelData.updatedAt}
+          searchItems={salesIntelData.todaySearchItems}
+        />
+        <div className="grid gap-4">
+          <OverviewStatusPanel salesIntelData={salesIntelData} competitorData={competitorData} />
+          <Card title={t("overview.quick.title")}>
+            <div className="grid gap-3">
+              {quickCards.map((item) => (
+                <OverviewActionCard key={item.href} {...item} />
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <OverviewLeadPreview items={salesIntelData.feed} />
+        <OverviewCompanySnapshot entries={companyEntries} />
+      </div>
+
+      <OverviewCompetitorSnapshot companies={visibleCompetitors} />
+    </div>
+  );
+}
+
 function FollowUpPanel({
   items,
 }: {
@@ -164,9 +454,7 @@ function FollowUpPanel({
 
   return (
     <Card title={t("follow_ups.title")}>
-      <Typography.Paragraph type="secondary">
-        {t("follow_ups.description")}
-      </Typography.Paragraph>
+      <Typography.Paragraph type="secondary">{t("follow_ups.description")}</Typography.Paragraph>
       {items.length ? (
         <div className="divide-y divide-(--color-line)">
           {items.map((item) => (
@@ -197,7 +485,9 @@ function SourcesPanel({
 }) {
   const { t } = useTranslation();
   const reportSource = salesIntelData.sourceBreakdown.find((item) => item.kind === "report");
-  const recruitmentSource = salesIntelData.sourceBreakdown.find((item) => item.kind === "recruitment");
+  const recruitmentSource = salesIntelData.sourceBreakdown.find(
+    (item) => item.kind === "recruitment"
+  );
   const items = [
     {
       title: t("sources.cards.report_title"),
@@ -219,20 +509,17 @@ function SourcesPanel({
     },
     {
       title: t("sources.cards.search_title"),
-      detail:
-        salesIntelData.todaySearchItems?.length
-          ? t("sources.cards.search_detail", {
-              value: salesIntelData.todaySearchItems.join("、"),
-            })
-          : t("sources.cards.search_empty"),
+      detail: salesIntelData.todaySearchItems?.length
+        ? t("sources.cards.search_detail", {
+            value: salesIntelData.todaySearchItems.join("、"),
+          })
+        : t("sources.cards.search_empty"),
     },
   ];
 
   return (
     <Card title={t("sources.title")}>
-      <Typography.Paragraph type="secondary">
-        {t("sources.description")}
-      </Typography.Paragraph>
+      <Typography.Paragraph type="secondary">{t("sources.description")}</Typography.Paragraph>
       <div className="divide-y divide-(--color-line)">
         {items.map((item) => (
           <div key={item.title} className="py-4 first:pt-0 last:pb-0">
@@ -260,15 +547,16 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
   const [priorityCompetitorSignal, setPriorityCompetitorSignal] = useState(0);
   const [selectedCities, setSelectedCities] = useState<SelectedCity[]>([]);
   const [isCityFilterOpen, setIsCityFilterOpen] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
 
     async function loadData() {
+      setIsInitialLoading(true);
+
       const [salesResult, competitorResult, adminIndexResult] = await Promise.allSettled([
-        loadJsonWithFallback<SalesIntelData>(
-          createRemoteOnlyDataSources("/api/sales/intel")
-        ),
+        loadJsonWithFallback<SalesIntelData>(createRemoteOnlyDataSources("/api/sales/intel")),
         loadJsonWithFallback<CompetitorData>(
           createDataSources("/api/competitors", "/competitors.json")
         ),
@@ -290,6 +578,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       setAdminIndex(
         adminIndexResult.status === "fulfilled" ? adminIndexResult.value : fallbackAdminIndex
       );
+      setIsInitialLoading(false);
     }
 
     loadData().catch(() => {
@@ -300,6 +589,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       setSalesIntelData(fallbackSalesIntelData);
       setCompetitorData(fallbackCompetitorData);
       setAdminIndex(fallbackAdminIndex);
+      setIsInitialLoading(false);
     });
 
     return () => {
@@ -437,47 +727,20 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
     },
   }[view];
 
+  if (isInitialLoading) {
+    return <DashboardLoadingSkeleton view={view} />;
+  }
+
   function renderContent() {
     switch (view) {
       case "overview":
         return (
-          <>
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <SalesIntelTodayPanel
-                items={salesIntelData.todayHighlights}
-                updatedAt={salesIntelData.updatedAt}
-                searchItems={salesIntelData.todaySearchItems}
-              />
-              <div className="grid gap-4">
-                <CompetitorCityFilter
-                  adminIndex={adminIndex}
-                  selectedCities={selectedCities}
-                  onChangeCities={setSelectedCities}
-                  onRemoveCity={(key) => {
-                    setSelectedCities((current) => current.filter((item) => item.key !== key));
-                  }}
-                  onOpenChange={setIsCityFilterOpen}
-                />
-                <CompetitorMapPanel
-                  baseline={competitorData.baseline}
-                  adminIndex={adminIndex}
-                  companies={visibleCompetitors}
-                  status={competitorStatus}
-                  note={competitorNote}
-                  updatedAt={competitorData.updatedAt}
-                  selectedKey={activeSelectedMapCompetitorKey}
-                  onSelect={(key) => {
-                    setSelectedMapCompetitorKey(key);
-                    setExpandedCompetitorKey(key);
-                    setPriorityCompetitorKey(key);
-                    setPriorityCompetitorSignal((value) => value + 1);
-                  }}
-                />
-              </div>
-            </div>
-
-            <OverviewLeadPreview items={salesIntelData.feed} />
-          </>
+          <OverviewCommandCenter
+            salesIntelData={salesIntelData}
+            competitorData={competitorData}
+            companyEntries={companyEntries}
+            visibleCompetitors={visibleCompetitors}
+          />
         );
       case "leads":
         return (
@@ -559,10 +822,13 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         <section className="overflow-visible rounded-4xl border border-(--color-line) bg-[linear-gradient(135deg,rgba(255,251,244,0.92),rgba(245,235,221,0.92))] p-6 shadow-[0_25px_70px_rgba(69,49,28,0.12)] sm:p-8 lg:p-10">
           <div className="space-y-8">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 <Space align="center" size={10}>
                   <span className="text-(--color-accent)">{viewConfig.icon}</span>
-                  <Typography.Text className="tracking-[0.28em] uppercase" style={{ color: "var(--color-accent)" }}>
+                  <Typography.Text
+                    className="tracking-[0.28em] uppercase"
+                    style={{ color: "var(--color-accent)" }}
+                  >
                     {viewConfig.eyebrow}
                   </Typography.Text>
                 </Space>
