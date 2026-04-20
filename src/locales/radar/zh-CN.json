@@ -163,6 +163,29 @@
     "open_companies": "进入企业库",
     "open_competitors": "进入同行监测",
     "open_sources": "查看数据源",
+    "priority": {
+      "title": "今日优先处理",
+      "updated_at": "更新时间 {{value}}",
+      "search_items": "今日检索 {{value}}",
+      "rank": "优先级 #{{value}}",
+      "empty": "当前没有今日重点线索，等待聚合任务写入。"
+    },
+    "attention": {
+      "title": "需要注意",
+      "tag": "待确认",
+      "normal_title": "当前没有阻断项",
+      "normal_detail": "销售总表、同行和数据源均有可用结果，可以继续进入具体栏目判断。",
+      "no_today": "当日十条未生成",
+      "no_today_detail": "需要检查招聘与平台聚合任务是否完成，或查看数据源页面确认同步状态。",
+      "no_sales": "销售总表为空",
+      "no_sales_detail": "页面能打开，但没有可供判断的销售线索，需要先恢复数据写入。",
+      "report_zero": "OpenClaw 日报今日为 0",
+      "report_zero_detail": "如果不是预期结果，需要检查 OpenClaw 定时任务和同步链路。",
+      "no_competitor": "同行数据为空",
+      "no_competitor_detail": "同行监测缺少判断基础，需要检查同行抓取和入库结果。",
+      "low_geocode": "部分同行缺少坐标",
+      "low_geocode_detail": "已有 {{mapped}}/{{total}} 家同行能落点，剩余公司不会显示在地图上。"
+    },
     "status": {
       "title": "后台链路状态",
       "report": "OpenClaw 日报",

@@ -122,6 +122,37 @@ function formatDisplayUpdatedAt(value: string) {
   return value.replace(/\s*CST$/u, "");
 }
 
+function getSalesStrengthScore(value: string) {
+  if (value.includes("高")) {
+    return 3;
+  }
+
+  if (value.includes("中")) {
+    return 2;
+  }
+
+  if (value.includes("低")) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function getSalesItemTime(item: SalesIntelItem) {
+  return item.retrievedAt || item.publishedAt || "";
+}
+
+function getSalesItemEntity(item: SalesIntelItem) {
+  return item.entity || item.title;
+}
+
+function getMappableCompetitorCount(companies: CompetitorCompany[]) {
+  return companies.filter(
+    (company) =>
+      Number.isFinite(Number(company.latitude)) && Number.isFinite(Number(company.longitude))
+  ).length;
+}
+
 function MetricCard({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
     <Card>
@@ -129,6 +160,106 @@ function MetricCard({ label, value, detail }: { label: string; value: number; de
       <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
         {detail}
       </Typography.Paragraph>
+    </Card>
+  );
+}
+
+function OverviewPriorityPanel({
+  items,
+  updatedAt,
+  searchItems,
+}: {
+  items: SalesIntelItem[];
+  updatedAt: string;
+  searchItems: string[];
+}) {
+  const { t } = useTranslation();
+  const priorityItems = [...items]
+    .sort((left, right) => {
+      const strengthOrder =
+        getSalesStrengthScore(right.strength) - getSalesStrengthScore(left.strength);
+
+      if (strengthOrder !== 0) {
+        return strengthOrder;
+      }
+
+      return getSalesItemTime(right).localeCompare(getSalesItemTime(left));
+    })
+    .slice(0, 4);
+  const primaryItem = priorityItems[0] ?? null;
+  const secondaryItems = priorityItems.slice(1);
+
+  return (
+    <Card
+      className="h-full overflow-hidden"
+      title={t("overview.priority.title")}
+      extra={
+        <Link href="/leads">
+          <Button type="link">{t("overview.open_leads")}</Button>
+        </Link>
+      }
+    >
+      <div className="space-y-5">
+        <div className="flex flex-wrap gap-2">
+          {updatedAt ? (
+            <Tag color="green">
+              {t("overview.priority.updated_at", { value: formatDisplayUpdatedAt(updatedAt) })}
+            </Tag>
+          ) : null}
+          {searchItems.length ? (
+            <Tag>{t("overview.priority.search_items", { value: searchItems.join("、") })}</Tag>
+          ) : null}
+        </div>
+
+        {primaryItem ? (
+          <div className="rounded-[1.5rem] border border-(--color-line) bg-[linear-gradient(135deg,rgba(255,250,241,0.95),rgba(243,233,217,0.86))] p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Tag color="orange">{t("overview.priority.rank", { value: 1 })}</Tag>
+              {primaryItem.category ? <Tag>{primaryItem.category}</Tag> : null}
+              {primaryItem.sourceLabel ? <Tag>{primaryItem.sourceLabel}</Tag> : null}
+              {primaryItem.strength ? (
+                <Tag color="red">{t("sales_intel.strength", { value: primaryItem.strength })}</Tag>
+              ) : null}
+            </div>
+            <Typography.Title level={3} style={{ marginTop: 14, marginBottom: 8 }}>
+              {getSalesItemEntity(primaryItem)}
+            </Typography.Title>
+            <Typography.Paragraph style={{ marginBottom: 0 }}>
+              {primaryItem.summary}
+            </Typography.Paragraph>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(primaryItem.tags ?? []).slice(0, 6).map((tag) => (
+                <Tag key={`${primaryItem.id}-${tag}`}>{tag}</Tag>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <Empty description={t("overview.priority.empty")} />
+        )}
+
+        {secondaryItems.length ? (
+          <div className="grid gap-3">
+            {secondaryItems.map((item, index) => (
+              <div
+                key={item.id}
+                className="rounded-[1.1rem] border border-(--color-line) bg-white/65 px-4 py-3"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <Typography.Text strong>{getSalesItemEntity(item)}</Typography.Text>
+                    <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
+                      {item.summary}
+                    </Typography.Paragraph>
+                  </div>
+                  <Tag className="shrink-0">
+                    {t("overview.priority.rank", { value: index + 2 })}
+                  </Tag>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </Card>
   );
 }
@@ -164,6 +295,93 @@ function OverviewLeadPreview({ items }: { items: SalesIntelItem[] }) {
         </div>
       ) : (
         <Empty description={t("sales_intel.no_data")} />
+      )}
+    </Card>
+  );
+}
+
+function OverviewAttentionPanel({
+  salesIntelData,
+  competitorData,
+}: {
+  salesIntelData: SalesIntelData;
+  competitorData: CompetitorData;
+}) {
+  const { t } = useTranslation();
+  const reportSource = salesIntelData.sourceBreakdown.find((item) => item.kind === "report");
+  const mappedCompetitorCount = getMappableCompetitorCount(competitorData.competitors);
+  const attentionItems = [
+    salesIntelData.totals.todayHighlights === 0
+      ? {
+          title: t("overview.attention.no_today"),
+          detail: t("overview.attention.no_today_detail"),
+          color: "orange",
+        }
+      : null,
+    salesIntelData.totals.overall === 0
+      ? {
+          title: t("overview.attention.no_sales"),
+          detail: t("overview.attention.no_sales_detail"),
+          color: "red",
+        }
+      : null,
+    reportSource && reportSource.count === 0
+      ? {
+          title: t("overview.attention.report_zero"),
+          detail: t("overview.attention.report_zero_detail"),
+          color: "orange",
+        }
+      : null,
+    competitorData.competitors.length === 0
+      ? {
+          title: t("overview.attention.no_competitor"),
+          detail: t("overview.attention.no_competitor_detail"),
+          color: "red",
+        }
+      : null,
+    competitorData.competitors.length > 0 &&
+    mappedCompetitorCount < competitorData.competitors.length
+      ? {
+          title: t("overview.attention.low_geocode"),
+          detail: t("overview.attention.low_geocode_detail", {
+            mapped: mappedCompetitorCount,
+            total: competitorData.competitors.length,
+          }),
+          color: "gold",
+        }
+      : null,
+  ].filter((item): item is { title: string; detail: string; color: string } => Boolean(item));
+
+  return (
+    <Card title={t("overview.attention.title")} className="h-full">
+      {attentionItems.length ? (
+        <div className="grid gap-3">
+          {attentionItems.map((item) => (
+            <div
+              key={item.title}
+              className="rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) px-4 py-3"
+            >
+              <div className="flex items-center gap-2">
+                <AlertOutlined className="text-(--color-accent)" />
+                <Typography.Text strong>{item.title}</Typography.Text>
+                <Tag color={item.color}>{t("overview.attention.tag")}</Tag>
+              </div>
+              <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                {item.detail}
+              </Typography.Paragraph>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) px-4 py-4">
+          <Space size={8}>
+            <CheckCircleOutlined className="text-(--color-accent)" />
+            <Typography.Text strong>{t("overview.attention.normal_title")}</Typography.Text>
+          </Space>
+          <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+            {t("overview.attention.normal_detail")}
+          </Typography.Paragraph>
+        </div>
       )}
     </Card>
   );
@@ -417,30 +635,32 @@ function OverviewCommandCenter({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.16fr)_minmax(20rem,0.84fr)]">
-        <SalesIntelTodayPanel
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(20rem,0.88fr)]">
+        <OverviewPriorityPanel
           items={salesIntelData.todayHighlights}
           updatedAt={salesIntelData.updatedAt}
-          searchItems={salesIntelData.todaySearchItems}
+          searchItems={salesIntelData.todaySearchItems ?? []}
         />
-        <div className="grid gap-4">
-          <OverviewStatusPanel salesIntelData={salesIntelData} competitorData={competitorData} />
-          <Card title={t("overview.quick.title")}>
-            <div className="grid gap-3">
-              {quickCards.map((item) => (
-                <OverviewActionCard key={item.href} {...item} />
-              ))}
-            </div>
-          </Card>
-        </div>
+        <OverviewAttentionPanel salesIntelData={salesIntelData} competitorData={competitorData} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <OverviewLeadPreview items={salesIntelData.feed} />
         <OverviewCompanySnapshot entries={companyEntries} />
+        <OverviewStatusPanel salesIntelData={salesIntelData} competitorData={competitorData} />
       </div>
 
-      <OverviewCompetitorSnapshot companies={visibleCompetitors} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.78fr)]">
+        <OverviewLeadPreview items={salesIntelData.feed} />
+        <OverviewCompetitorSnapshot companies={visibleCompetitors} />
+      </div>
+
+      <Card title={t("overview.quick.title")}>
+        <div className="grid gap-3 md:grid-cols-3">
+          {quickCards.map((item) => (
+            <OverviewActionCard key={item.href} {...item} />
+          ))}
+        </div>
+      </Card>
     </div>
   );
 }
