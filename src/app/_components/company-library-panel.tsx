@@ -154,6 +154,63 @@ function getEntryTotalJobCount(entries: CompanyLibraryEntry[]) {
   return entries.reduce((total, entry) => total + entry.allJobsCount, 0);
 }
 
+function getSignalTime(item: SalesIntelItem) {
+  return compactText(item.retrievedAt || item.publishedAt || "");
+}
+
+function getEntryFirstSignalAt(entry: CompanyLibraryEntry) {
+  const times = entry.items
+    .map((item) => getSignalTime(item))
+    .filter(Boolean)
+    .sort(compareTimestampDesc);
+
+  return times[times.length - 1] ?? "";
+}
+
+const DEMAND_KEYWORDS = [
+  "MES",
+  "WMS",
+  "QMS",
+  "ERP",
+  "PLM",
+  "APS",
+  "WCS",
+  "SCADA",
+  "智能制造",
+  "工业互联网",
+  "数字化",
+  "制造执行",
+  "生产管理",
+  "质量管理",
+  "仓储",
+] as const;
+
+function collectCompanyDemandTags(entry: CompanyLibraryEntry, jobs: CompanyJob[]) {
+  const signalText = [
+    entry.latestSummary,
+    ...entry.items.flatMap((item) => [
+      item.title,
+      item.summary,
+      item.subtitle,
+      item.category,
+      item.actionText,
+      ...(item.tags ?? []),
+    ]),
+    ...jobs.flatMap((job) => [job.jobTitle, job.descriptionEvidence, ...(job.keywordHits ?? [])]),
+  ]
+    .map((item) => compactText(item))
+    .join(" ")
+    .toUpperCase();
+
+  return DEMAND_KEYWORDS.filter((keyword) => signalText.includes(keyword.toUpperCase()));
+}
+
+function collectCompanyTimeline(entry: CompanyLibraryEntry) {
+  return [...entry.items]
+    .sort((left, right) => compareTimestampDesc(getSignalTime(left), getSignalTime(right)))
+    .slice(0, 8);
+}
+
 export function buildCompanyLibraryEntries(items: SalesIntelItem[]) {
   const companyMap = new Map<string, CompanyLibraryEntry>();
 
@@ -301,6 +358,173 @@ function CompanyMetricCard({
   );
 }
 
+function CompanyProfileField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1rem] border border-(--color-line) bg-white/65 px-4 py-3">
+      <Typography.Text type="secondary">{label}</Typography.Text>
+      <Typography.Paragraph strong style={{ marginTop: 6, marginBottom: 0 }}>
+        {value}
+      </Typography.Paragraph>
+    </div>
+  );
+}
+
+function DemandJudgementCard({ demandTags }: { demandTags: readonly string[] }) {
+  const { t } = useTranslation();
+
+  return (
+    <Card size="small" title={t("companies.profile.demand_title")}>
+      {demandTags.length ? (
+        <div className="space-y-3">
+          <Space wrap size={[8, 8]}>
+            {demandTags.map((tag) => (
+              <Tag key={tag} color="blue">
+                {tag}
+              </Tag>
+            ))}
+          </Space>
+          <Typography.Paragraph style={{ marginBottom: 0 }}>
+            {t("companies.profile.demand_description", {
+              value: demandTags.slice(0, 5).join(" / "),
+            })}
+          </Typography.Paragraph>
+        </div>
+      ) : (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          {t("companies.profile.demand_empty")}
+        </Typography.Paragraph>
+      )}
+    </Card>
+  );
+}
+
+function FollowUpReserveCard({
+  stageLabel,
+  stageColor,
+  nextAction,
+}: {
+  stageLabel: string;
+  stageColor: string;
+  nextAction: string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Card size="small" title={t("companies.profile.followup_title")}>
+      <div className="grid gap-3 text-sm md:grid-cols-2">
+        <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
+          <Typography.Text type="secondary">{t("companies.profile.stage_label")}</Typography.Text>
+          <Tag color={stageColor}>{stageLabel}</Tag>
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
+          <Typography.Text type="secondary">{t("companies.profile.owner_label")}</Typography.Text>
+          <Typography.Text>{t("companies.profile.owner_empty")}</Typography.Text>
+        </div>
+        <div className="rounded-[1rem] border border-(--color-line) bg-(--color-card-soft) px-3 py-3 md:col-span-2">
+          <Typography.Text type="secondary">
+            {t("companies.profile.next_action_label")}
+          </Typography.Text>
+          <Typography.Paragraph style={{ marginTop: 6, marginBottom: 0 }}>
+            {nextAction || t("companies.profile.next_action_empty")}
+          </Typography.Paragraph>
+        </div>
+        <div className="rounded-[1rem] border border-dashed border-(--color-line) bg-white/45 px-3 py-3 md:col-span-2">
+          <Typography.Text type="secondary">{t("companies.profile.note_label")}</Typography.Text>
+          <Typography.Paragraph style={{ marginTop: 6, marginBottom: 0 }}>
+            {t("companies.profile.note_empty")}
+          </Typography.Paragraph>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function CompanyTimelineCard({ entry }: { entry: CompanyLibraryEntry }) {
+  const { t } = useTranslation();
+  const timelineItems = collectCompanyTimeline(entry);
+
+  return (
+    <Card
+      title={
+        <Space size={8}>
+          <ScheduleOutlined />
+          <span>{t("companies.profile.timeline_title")}</span>
+        </Space>
+      }
+    >
+      {timelineItems.length ? (
+        <div className="space-y-0">
+          {timelineItems.map((item, index) => {
+            const signalTime = getSignalTime(item);
+
+            return (
+              <div key={item.id} className="relative grid gap-3 pl-6 pb-5 last:pb-0">
+                <span className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-(--color-accent)" />
+                {index < timelineItems.length - 1 ? (
+                  <span className="absolute left-[5px] top-5 bottom-0 w-px bg-(--color-line)" />
+                ) : null}
+                <div className="space-y-2">
+                  <Space wrap size={[8, 8]}>
+                    {signalTime ? (
+                      <Tag>{`${t("entry.retrieved_at")} ${formatDisplayUpdatedAt(signalTime)}`}</Tag>
+                    ) : null}
+                    {item.sourceLabel ? <Tag>{item.sourceLabel}</Tag> : null}
+                    {item.category ? <Tag color="blue">{item.category}</Tag> : null}
+                  </Space>
+                  <Typography.Text strong>{item.title}</Typography.Text>
+                  <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
+                    {item.summary}
+                  </Typography.Paragraph>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <Empty description={t("companies.profile.timeline_empty")} />
+      )}
+    </Card>
+  );
+}
+
+function RiskPanel({
+  riskItems,
+}: {
+  riskItems: Array<{ title: string; detail: string; color: string }>;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Card size="small" title={t("companies.profile.risk_title")}>
+      {riskItems.length ? (
+        <div className="grid gap-3">
+          {riskItems.map((item) => (
+            <div
+              key={item.title}
+              className="rounded-[1rem] border border-(--color-line) bg-(--color-card-soft) px-3 py-3"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag color={item.color}>{t("companies.profile.risk_tag")}</Tag>
+                <Typography.Text strong>{item.title}</Typography.Text>
+              </div>
+              <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                {item.detail}
+              </Typography.Paragraph>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
+          <Typography.Text strong>{t("companies.profile.risk_normal_title")}</Typography.Text>
+          <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+            {t("companies.profile.risk_normal_detail")}
+          </Typography.Paragraph>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function SignalRow({ item }: { item: SalesIntelItem }) {
   const { t } = useTranslation();
   const retrievedAt = compactText(item.retrievedAt || item.publishedAt || "");
@@ -392,7 +616,47 @@ function CompanyProfile({ entry }: { entry: CompanyLibraryEntry | null }) {
       : followUpStage === "watch"
         ? t("companies.profile.stages.watch")
         : t("companies.profile.stages.screening");
+  const followUpStageColor = followUpStage === "priority" ? "orange" : "blue";
   const nextAction = getLatestAction(entry);
+  const firstSignalAt = getEntryFirstSignalAt(entry);
+  const demandTags = collectCompanyDemandTags(entry, jobs);
+  const riskItems = [
+    entry.signalCount <= 1
+      ? {
+          title: t("companies.profile.risks.single_signal_title"),
+          detail: t("companies.profile.risks.single_signal_detail"),
+          color: "gold",
+        }
+      : null,
+    entry.sourcePlatforms.length <= 1
+      ? {
+          title: t("companies.profile.risks.single_source_title"),
+          detail: t("companies.profile.risks.single_source_detail"),
+          color: "gold",
+        }
+      : null,
+    jobs.length === 0
+      ? {
+          title: t("companies.profile.risks.no_job_title"),
+          detail: t("companies.profile.risks.no_job_detail"),
+          color: "default",
+        }
+      : null,
+    strengthScore(entry.strongest) < 3
+      ? {
+          title: t("companies.profile.risks.low_strength_title"),
+          detail: t("companies.profile.risks.low_strength_detail"),
+          color: "blue",
+        }
+      : null,
+    !entry.latestRetrievedAt
+      ? {
+          title: t("companies.profile.risks.no_time_title"),
+          detail: t("companies.profile.risks.no_time_detail"),
+          color: "red",
+        }
+      : null,
+  ].filter((item): item is { title: string; detail: string; color: string } => Boolean(item));
 
   return (
     <div className="space-y-5">
@@ -442,39 +706,52 @@ function CompanyProfile({ entry }: { entry: CompanyLibraryEntry | null }) {
             />
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_minmax(19rem,0.82fr)]">
+          <Card size="small" title={t("companies.profile.basic_title")}>
+            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              <CompanyProfileField
+                label={t("companies.profile.fields.company")}
+                value={entry.companyName}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.city")}
+                value={entry.city || t("companies.unknown_city")}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.first_seen")}
+                value={
+                  firstSignalAt
+                    ? formatDisplayUpdatedAt(firstSignalAt)
+                    : t("sales_intel.not_synced")
+                }
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.latest_seen")}
+                value={
+                  entry.latestRetrievedAt
+                    ? formatDisplayUpdatedAt(entry.latestRetrievedAt)
+                    : t("sales_intel.not_synced")
+                }
+              />
+            </div>
+          </Card>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(20rem,0.92fr)]">
             <Card size="small" title={t("companies.profile.summary_title")}>
               <Typography.Paragraph style={{ marginBottom: 0 }}>
                 {entry.latestSummary || t("companies.profile.summary_empty")}
               </Typography.Paragraph>
             </Card>
 
-            <Card size="small" title={t("companies.profile.followup_title")}>
-              <div className="grid gap-3 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <Typography.Text type="secondary">
-                    {t("companies.profile.stage_label")}
-                  </Typography.Text>
-                  <Tag color={followUpStage === "priority" ? "orange" : "blue"}>
-                    {followUpStageLabel}
-                  </Tag>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <Typography.Text type="secondary">
-                    {t("companies.profile.owner_label")}
-                  </Typography.Text>
-                  <Typography.Text>{t("companies.profile.owner_empty")}</Typography.Text>
-                </div>
-                <div className="rounded-[1rem] border border-(--color-line) bg-(--color-card-soft) px-3 py-3">
-                  <Typography.Text type="secondary">
-                    {t("companies.profile.next_action_label")}
-                  </Typography.Text>
-                  <Typography.Paragraph style={{ marginTop: 6, marginBottom: 0 }}>
-                    {nextAction || t("companies.profile.next_action_empty")}
-                  </Typography.Paragraph>
-                </div>
-              </div>
-            </Card>
+            <DemandJudgementCard demandTags={demandTags} />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(20rem,0.92fr)]">
+            <FollowUpReserveCard
+              stageLabel={followUpStageLabel}
+              stageColor={followUpStageColor}
+              nextAction={nextAction}
+            />
+            <RiskPanel riskItems={riskItems} />
           </div>
 
           <Card size="small" title={t("companies.profile.source_title")}>
@@ -494,20 +771,7 @@ function CompanyProfile({ entry }: { entry: CompanyLibraryEntry | null }) {
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-        <Card
-          title={
-            <Space size={8}>
-              <ScheduleOutlined />
-              <span>{t("companies.recent_signals")}</span>
-            </Space>
-          }
-        >
-          <div className="divide-y divide-(--color-line)">
-            {entry.items.slice(0, 6).map((item) => (
-              <SignalRow key={item.id} item={item} />
-            ))}
-          </div>
-        </Card>
+        <CompanyTimelineCard entry={entry} />
 
         <Card
           title={
@@ -520,6 +784,21 @@ function CompanyProfile({ entry }: { entry: CompanyLibraryEntry | null }) {
           <JobPreviewList jobs={jobs} />
         </Card>
       </div>
+
+      <Card
+        title={
+          <Space size={8}>
+            <FileSearchOutlined />
+            <span>{t("companies.recent_signals")}</span>
+          </Space>
+        }
+      >
+        <div className="divide-y divide-(--color-line)">
+          {entry.items.slice(0, 6).map((item) => (
+            <SignalRow key={item.id} item={item} />
+          ))}
+        </div>
+      </Card>
     </div>
   );
 }
