@@ -1,7 +1,15 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 
-import { initializeStore, readCompetitorUpdates, readDocument, resolveConfig } from "./lib/store.mjs";
+import {
+  initializeStore,
+  readCompetitorUpdates,
+  readDocument,
+  readFollowUpRecord,
+  readFollowUpRecords,
+  resolveConfig,
+  upsertFollowUpRecord,
+} from "./lib/store.mjs";
 
 const DEFAULT_TOPBAR_CONTEXT = Object.freeze({
   city: "烟台开发区",
@@ -264,9 +272,10 @@ function createCurrentDaySalesIntelPayload(payload) {
 
   return {
     ...payload,
-    todaySearchItems: todayHighlights.length && Array.isArray(payload?.todaySearchItems)
-      ? payload.todaySearchItems
-      : [],
+    todaySearchItems:
+      todayHighlights.length && Array.isArray(payload?.todaySearchItems)
+        ? payload.todaySearchItems
+        : [],
     totals,
     todayHighlights,
   };
@@ -318,6 +327,7 @@ function buildApp(config, db) {
 
   app.register(cors, {
     origin: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
   app.get("/api/health", async () => {
@@ -420,6 +430,53 @@ function buildApp(config, db) {
     return {
       items: readCompetitorUpdates(db, limit),
     };
+  });
+
+  app.get("/api/follow-ups", async () => {
+    const items = readFollowUpRecords(db);
+
+    return {
+      items,
+      totals: {
+        overall: items.length,
+        assigned: items.filter((item) => item.owner).length,
+        unassigned: items.filter((item) => !item.owner).length,
+      },
+    };
+  });
+
+  app.get("/api/follow-ups/:companyId", async (request, reply) => {
+    const item = readFollowUpRecord(db, request.params?.companyId);
+
+    if (!item) {
+      reply.code(404);
+      return {
+        ok: false,
+        message: "Follow-up record not found",
+      };
+    }
+
+    return item;
+  });
+
+  app.put("/api/follow-ups/:companyId", async (request, reply) => {
+    try {
+      const item = upsertFollowUpRecord(db, {
+        ...(request.body ?? {}),
+        companyId: request.params?.companyId,
+      });
+
+      return {
+        ok: true,
+        item,
+      };
+    } catch (error) {
+      reply.code(400);
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Invalid follow-up record",
+      };
+    }
   });
 
   app.get("/api/recruitment/leads", async (_request, reply) => {

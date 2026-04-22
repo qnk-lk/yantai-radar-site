@@ -13,6 +13,7 @@ const COMPETITOR_STALE_THRESHOLD = 3;
 const COMPETITOR_CITY_PRIORITY = ["烟台", "青岛"];
 const COMPETITOR_DISTANCE_PRIORITY = ["烟台本地", "青岛重点"];
 const DEFAULT_COMPETITOR_UPDATE_LIMIT = 40;
+const FOLLOW_UP_STAGES = new Set(["priority", "watch", "screening"]);
 
 export const DOCUMENT_DEFINITIONS = {
   radar: {
@@ -89,9 +90,7 @@ function normalizeStringList(value) {
     return [];
   }
 
-  return value
-    .map((item) => normalizeText(item))
-    .filter(Boolean);
+  return value.map((item) => normalizeText(item)).filter(Boolean);
 }
 
 function normalizeOptionalNumber(value) {
@@ -133,14 +132,18 @@ function normalizeCompetitor(value, index) {
     whyRelevant: normalizeText(value?.whyRelevant),
     evidenceStrength: normalizeText(value?.evidenceStrength),
     evidence: Array.isArray(value?.evidence)
-      ? value.evidence.map((item) => normalizeEvidenceItem(item)).filter((item) => item.source || item.url || item.note)
+      ? value.evidence
+          .map((item) => normalizeEvidenceItem(item))
+          .filter((item) => item.source || item.url || item.note)
       : [],
   };
 }
 
 function normalizeCompetitorPayload(payload) {
   const baselineEvidence = Array.isArray(payload?.baseline?.evidence)
-    ? payload.baseline.evidence.map((item) => normalizeEvidenceItem(item)).filter((item) => item.source || item.url || item.note)
+    ? payload.baseline.evidence
+        .map((item) => normalizeEvidenceItem(item))
+        .filter((item) => item.source || item.url || item.note)
     : [];
 
   return {
@@ -206,6 +209,47 @@ function parseStoredUpdateValue(value) {
   } catch {
     return value;
   }
+}
+
+function normalizeFollowUpStage(value) {
+  const stage = normalizeText(value, "screening");
+  return FOLLOW_UP_STAGES.has(stage) ? stage : "screening";
+}
+
+function normalizeFollowUpRecord(row) {
+  return {
+    companyId: row.company_id,
+    companyName: row.company_name,
+    city: row.city,
+    stage: row.stage,
+    owner: row.owner,
+    nextReminderAt: row.next_reminder_at,
+    note: row.note,
+    lastFollowedAt: row.last_followed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeFollowUpInput(input) {
+  const now = new Date().toISOString();
+  const companyId = normalizeText(input?.companyId);
+
+  if (!companyId) {
+    throw new Error("companyId is required");
+  }
+
+  return {
+    companyId,
+    companyName: normalizeText(input?.companyName),
+    city: normalizeText(input?.city),
+    stage: normalizeFollowUpStage(input?.stage),
+    owner: normalizeText(input?.owner),
+    nextReminderAt: normalizeText(input?.nextReminderAt),
+    note: normalizeText(input?.note),
+    lastFollowedAt: normalizeText(input?.lastFollowedAt),
+    updatedAt: normalizeText(input?.updatedAt, now),
+  };
 }
 
 function cityPriority(city) {
@@ -329,7 +373,14 @@ function readCompetitorEvidenceMap(db, competitorId) {
   return new Map(rows.map((row) => [row.id, row]));
 }
 
-function upsertCompetitorMaster(db, competitorId, competitor, snapshotId, importedAt, snapshotUpdatedAt) {
+function upsertCompetitorMaster(
+  db,
+  competitorId,
+  competitor,
+  snapshotId,
+  importedAt,
+  snapshotUpdatedAt
+) {
   db.prepare(
     `
       INSERT INTO competitor_master (
@@ -570,7 +621,14 @@ function importCompetitorDocument(db, rawPayload, source) {
       const previous = existingMaster.get(competitorId);
       currentIds.add(competitorId);
 
-      upsertCompetitorMaster(db, competitorId, competitor, snapshotId, importedAt, snapshotUpdatedAt);
+      upsertCompetitorMaster(
+        db,
+        competitorId,
+        competitor,
+        snapshotId,
+        importedAt,
+        snapshotUpdatedAt
+      );
 
       if (!previous) {
         createCompetitorUpdate(db, {
@@ -594,7 +652,9 @@ function importCompetitorDocument(db, rawPayload, source) {
           latitude: normalizeOptionalNumber(parseJsonText(previous.latest_payload, {})?.latitude),
           longitude: normalizeOptionalNumber(parseJsonText(previous.latest_payload, {})?.longitude),
           geocodeSource: normalizeText(parseJsonText(previous.latest_payload, {})?.geocodeSource),
-          geocodeConfidence: normalizeText(parseJsonText(previous.latest_payload, {})?.geocodeConfidence),
+          geocodeConfidence: normalizeText(
+            parseJsonText(previous.latest_payload, {})?.geocodeConfidence
+          ),
           geocodedAt: normalizeText(parseJsonText(previous.latest_payload, {})?.geocodedAt),
           distanceTier: previous.distance_tier,
           serviceFit: previous.service_fit,
@@ -619,7 +679,11 @@ function importCompetitorDocument(db, rawPayload, source) {
           ["geocodedAt", previousComparable.geocodedAt, competitor.geocodedAt],
           ["distanceTier", previousComparable.distanceTier, competitor.distanceTier],
           ["serviceFit", previousComparable.serviceFit, competitor.serviceFit],
-          ["manufacturingFocus", previousComparable.manufacturingFocus, competitor.manufacturingFocus],
+          [
+            "manufacturingFocus",
+            previousComparable.manufacturingFocus,
+            competitor.manufacturingFocus,
+          ],
           ["coreServices", previousComparable.coreServices, competitor.coreServices],
           ["whyRelevant", previousComparable.whyRelevant, competitor.whyRelevant],
           ["evidenceStrength", previousComparable.evidenceStrength, competitor.evidenceStrength],
@@ -744,6 +808,19 @@ export function ensureSchema(db) {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS follow_up_records (
+      company_id TEXT PRIMARY KEY,
+      company_name TEXT NOT NULL,
+      city TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      owner TEXT NOT NULL DEFAULT '',
+      next_reminder_at TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      last_followed_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_competitor_master_active
       ON competitor_master (is_active, city, latest_rank);
 
@@ -752,6 +829,12 @@ export function ensureSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_competitor_updates_created
       ON competitor_updates (created_at DESC, id DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_follow_up_records_stage
+      ON follow_up_records (stage, updated_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_follow_up_records_reminder
+      ON follow_up_records (next_reminder_at, updated_at DESC);
   `);
 }
 
@@ -799,7 +882,9 @@ export function readDocument(db, key) {
 }
 
 export function readCompetitorUpdates(db, limit = DEFAULT_COMPETITOR_UPDATE_LIMIT) {
-  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(200, Math.trunc(limit))) : DEFAULT_COMPETITOR_UPDATE_LIMIT;
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(200, Math.trunc(limit)))
+    : DEFAULT_COMPETITOR_UPDATE_LIMIT;
 
   const rows = db
     .prepare(
@@ -842,6 +927,99 @@ export function readCompetitorUpdates(db, limit = DEFAULT_COMPETITOR_UPDATE_LIMI
     createdAt: row.created_at,
     snapshotUpdatedAt: row.snapshot_updated_at,
   }));
+}
+
+export function readFollowUpRecords(db) {
+  return db
+    .prepare(
+      `
+        SELECT
+          company_id,
+          company_name,
+          city,
+          stage,
+          owner,
+          next_reminder_at,
+          note,
+          last_followed_at,
+          created_at,
+          updated_at
+        FROM follow_up_records
+        ORDER BY updated_at DESC, company_name ASC
+      `
+    )
+    .all()
+    .map(normalizeFollowUpRecord);
+}
+
+export function readFollowUpRecord(db, companyId) {
+  const row = db
+    .prepare(
+      `
+        SELECT
+          company_id,
+          company_name,
+          city,
+          stage,
+          owner,
+          next_reminder_at,
+          note,
+          last_followed_at,
+          created_at,
+          updated_at
+        FROM follow_up_records
+        WHERE company_id = ?
+      `
+    )
+    .get(normalizeText(companyId));
+
+  return row ? normalizeFollowUpRecord(row) : null;
+}
+
+export function upsertFollowUpRecord(db, input) {
+  const record = normalizeFollowUpInput(input);
+  const now = new Date().toISOString();
+  const createdAt = now;
+
+  db.prepare(
+    `
+      INSERT INTO follow_up_records (
+        company_id,
+        company_name,
+        city,
+        stage,
+        owner,
+        next_reminder_at,
+        note,
+        last_followed_at,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(company_id) DO UPDATE SET
+        company_name = excluded.company_name,
+        city = excluded.city,
+        stage = excluded.stage,
+        owner = excluded.owner,
+        next_reminder_at = excluded.next_reminder_at,
+        note = excluded.note,
+        last_followed_at = excluded.last_followed_at,
+        updated_at = excluded.updated_at
+    `
+  ).run(
+    record.companyId,
+    record.companyName,
+    record.city,
+    record.stage,
+    record.owner,
+    record.nextReminderAt,
+    record.note,
+    record.lastFollowedAt,
+    createdAt,
+    record.updatedAt
+  );
+
+  return readFollowUpRecord(db, record.companyId);
 }
 
 function hasCompetitorState(db) {

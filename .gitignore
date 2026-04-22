@@ -28,6 +28,7 @@ __pycache__/
 .playwright-cli/
 output/
 .tmp/
+.codex-logs/
 .next-dev*.log
 .tmp-next-webpack*.log
 

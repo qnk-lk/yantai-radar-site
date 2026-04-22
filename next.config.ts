@@ -9,6 +9,8 @@ const localApiProxyUrl =
   process.env.RADAR_API_PROXY_URL ||
   process.env.NEXT_PUBLIC_RADAR_API_BASE_URL ||
   "http://127.0.0.1:3180";
+const localFollowUpApiProxyUrl =
+  process.env.RADAR_FOLLOW_UP_API_PROXY_URL || "http://127.0.0.1:3180";
 const allowedDevOrigins = [
   "localhost",
   "127.0.0.1",
@@ -31,6 +33,10 @@ const nextConfig: NextConfig = {
     ? {
         async rewrites() {
           return [
+            {
+              source: "/api/follow-ups/:path*",
+              destination: `${localFollowUpApiProxyUrl}/api/follow-ups/:path*`,
+            },
             {
               source: "/api/:path*",
               destination: `${localApiProxyUrl}/api/:path*`,

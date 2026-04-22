@@ -239,6 +239,10 @@
       "stage_label": "当前阶段",
       "owner_label": "负责人",
       "owner_empty": "暂未分配",
+      "next_reminder_label": "下次提醒",
+      "next_reminder_empty": "暂未设置",
+      "last_followed_label": "最后跟进",
+      "last_followed_empty": "暂未跟进",
       "next_action_label": "建议动作",
       "next_action_empty": "等待后续跟进规则接入。",
       "note_label": "跟进备注",
@@ -279,8 +283,102 @@
   },
   "follow_ups": {
     "title": "建议优先纳入跟进的企业",
-    "description": "当前先依据最近检索和聚合结果给出建议跟进对象，后续再接阶段、负责人、提醒和记录。",
-    "empty_description": "当前还没有足够的数据生成建议跟进对象。"
+    "description": "当前先依据最近检索和聚合结果自动分层，帮助你先判断哪些企业需要立刻联系，哪些企业只需要继续补证。",
+    "manual_status_pending": "暂未接人工负责人和跟进记录",
+    "manual_status_ready": "已保存 {{count}} 条跟进记录 · 已分配 {{assigned}} 家",
+    "empty_description": "当前还没有足够的数据生成建议跟进对象。",
+    "empty_stage": "当前阶段没有企业。",
+    "future_title": "后续闭环方向",
+    "future_description": "下一阶段可以继续补沟通记录、触达结果、提醒规则和成交阶段，让情报线索真正进入销售动作闭环。",
+    "stages": {
+      "priority": "优先跟进",
+      "watch": "持续观察",
+      "screening": "初筛池"
+    },
+    "metrics": {
+      "priority": "优先跟进",
+      "priority_detail": "强度高、信号多或岗位需求明显的企业。",
+      "watch": "持续观察",
+      "watch_detail": "已有一定迹象，但还需要补充证据的企业。",
+      "screening": "初筛企业",
+      "screening_detail": "目前只保留早期信号，暂不建议马上投入重跟进。",
+      "unassigned": "未分配负责人",
+      "unassigned_detail": "当前跟进状态还未接人工负责人，全部属于自动建议。"
+    },
+    "stage_sections": {
+      "priority_title": "优先跟进",
+      "priority_description": "这组企业优先建议当天或次日联系，目标是确认真实项目、预算或系统改造节点。",
+      "watch_title": "持续观察",
+      "watch_description": "这组企业适合继续补官网、招聘、社媒和公开项目证据，避免过早投入销售精力。",
+      "screening_title": "初筛池",
+      "screening_description": "这组企业只说明有弱信号，后续如果重复出现再升级到观察或优先跟进。"
+    },
+    "fields": {
+      "signal_count": "累计信号",
+      "job_count": "岗位数量",
+      "latest_time": "最近检索",
+      "platforms": "来源平台",
+      "no_platform": "暂无来源平台",
+      "strength": "强度 {{value}}",
+      "evidence_score": "证据完整度",
+      "next_action": "建议动作",
+      "risk": "当前风险",
+      "owner": "负责人",
+      "next_reminder": "下次提醒",
+      "last_followed": "最后跟进",
+      "manual_note": "跟进备注"
+    },
+    "values": {
+      "signal_count": "{{count}} 条",
+      "job_count": "{{count}} 个",
+      "company_count": "{{count}} 家",
+      "unassigned_owner": "未分配",
+      "no_reminder": "未设置",
+      "not_followed": "未跟进",
+      "no_note": "暂无备注"
+    },
+    "actions": {
+      "open_profile": "查看企业档案",
+      "edit": "编辑跟进"
+    },
+    "editor": {
+      "title": "编辑跟进：{{company}}",
+      "save": "保存",
+      "cancel": "取消",
+      "stage": "跟进阶段",
+      "stage_required": "请选择跟进阶段",
+      "owner": "负责人",
+      "owner_placeholder": "填写负责人",
+      "next_reminder": "下次提醒时间",
+      "last_followed": "最后跟进时间",
+      "time_placeholder": "例如 2026-04-22 09:30:00",
+      "mark_now": "填当前时间",
+      "note": "跟进备注",
+      "note_placeholder": "记录电话、微信、拜访、判断依据或下一步动作"
+    },
+    "messages": {
+      "saved": "跟进记录已保存",
+      "save_failed": "跟进记录保存失败"
+    },
+    "suggested_actions": {
+      "priority": "先确认企业是否存在 MES、QMS、WMS、ERP 或数字化改造需求，再判断是否适合电话、微信或拜访切入。",
+      "watch": "先补充该公司的官网、招聘详情、社媒动态和上下游信息，确认需求是否持续出现。",
+      "screening": "先保留在观察池，等待后续任务再次命中或出现更明确岗位、项目、采购和扩产信号。"
+    },
+    "risks": {
+      "single_signal": "目前只有一次命中，误判概率较高，建议先补第二个证据来源。",
+      "single_platform": "来源平台相对单一，需要用其他渠道交叉验证。",
+      "no_jobs": "缺少岗位明细，当前只能按摘要判断需求方向。",
+      "normal": "当前证据相对完整，可以进入下一步人工判断。"
+    },
+    "reasons": {
+      "high_strength": "高强度信号",
+      "multiple_signals": "{{count}} 次命中",
+      "job_volume": "{{count}} 个岗位",
+      "multi_platform": "{{count}} 个来源",
+      "recent_signal": "有最近检索时间",
+      "basic_signal": "基础线索"
+    }
   },
   "sources": {
     "title": "数据源状态概览",
@@ -292,9 +390,24 @@
       "recruitment_detail": "已同步 {{count}} 条招聘类信息",
       "competitor_title": "同行链路",
       "competitor_detail": "当前共有 {{count}} 家同行样本",
+      "follow_up_title": "跟进记录",
+      "follow_up_detail": "当前已保存 {{count}} 条人工跟进记录",
       "search_title": "今日检索项",
       "search_detail": "当前随机命中的检索项：{{value}}",
       "search_empty": "当前还没有记录到今日检索项。"
+    },
+    "health": {
+      "title": "接口与数据库状态",
+      "api_status": "API 状态",
+      "online": "在线",
+      "unknown": "未知",
+      "api_ok": "健康检查接口可访问。",
+      "api_unknown": "当前没有拿到健康检查结果。",
+      "document_count": "数据库文档",
+      "document_count_detail": "统计当前后端 documents 表中的业务数据快照。",
+      "follow_up_records": "跟进记录",
+      "follow_up_records_detail": "统计已保存的人工跟进记录数量。",
+      "empty_documents": "当前没有拿到数据库文档状态。"
     }
   },
   "sections": {

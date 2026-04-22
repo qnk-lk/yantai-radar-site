@@ -37,6 +37,8 @@ import { SalesIntelFeedPanel } from "./sales-intel-feed-panel";
 import { SalesIntelTodayPanel } from "./sales-intel-today-panel";
 import type { SalesIntelData, SalesIntelItem } from "./sales-intel-types";
 import { DashboardLoadingSkeleton } from "./dashboard-loading-skeleton";
+import { FollowUpManagementPanel } from "./follow-up-management-panel";
+import type { FollowUpRecord, FollowUpRecordsPayload } from "./follow-up-types";
 
 export type DashboardView =
   | "overview"
@@ -45,6 +47,18 @@ export type DashboardView =
   | "competitors"
   | "follow-ups"
   | "sources";
+
+type ApiHealthPayload = {
+  ok: boolean;
+  dataDir: string;
+  dbPath: string;
+  timestamp: string;
+  documents: Array<{
+    key: string;
+    source: string;
+    updated_at: string;
+  }>;
+};
 
 const fallbackAdminIndex: ChinaAdminIndex = {};
 
@@ -153,7 +167,15 @@ function getMappableCompetitorCount(companies: CompetitorCompany[]) {
   ).length;
 }
 
-function MetricCard({ label, value, detail }: { label: string; value: number; detail: string }) {
+function MetricCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+}) {
   return (
     <Card>
       <Statistic title={label} value={value} />
@@ -665,49 +687,23 @@ function OverviewCommandCenter({
   );
 }
 
-function FollowUpPanel({
-  items,
-}: {
-  items: Array<{ title: string; summary: string; meta: string }>;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <Card title={t("follow_ups.title")}>
-      <Typography.Paragraph type="secondary">{t("follow_ups.description")}</Typography.Paragraph>
-      {items.length ? (
-        <div className="divide-y divide-(--color-line)">
-          {items.map((item) => (
-            <div key={`${item.title}-${item.meta}`} className="py-4 first:pt-0 last:pb-0">
-              <Space orientation="vertical" size={4} style={{ display: "flex" }}>
-                <Typography.Text strong>{item.title}</Typography.Text>
-                <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
-                  {item.summary}
-                </Typography.Paragraph>
-                <Typography.Text type="secondary">{item.meta}</Typography.Text>
-              </Space>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <Empty description={t("follow_ups.empty_description")} />
-      )}
-    </Card>
-  );
-}
-
 function SourcesPanel({
   salesIntelData,
   competitorData,
+  followUpRecords,
+  apiHealth,
 }: {
   salesIntelData: SalesIntelData;
   competitorData: CompetitorData;
+  followUpRecords: FollowUpRecord[];
+  apiHealth: ApiHealthPayload | null;
 }) {
   const { t } = useTranslation();
   const reportSource = salesIntelData.sourceBreakdown.find((item) => item.kind === "report");
   const recruitmentSource = salesIntelData.sourceBreakdown.find(
     (item) => item.kind === "recruitment"
   );
+  const healthDocuments = apiHealth?.documents ?? [];
   const items = [
     {
       title: t("sources.cards.report_title"),
@@ -728,6 +724,12 @@ function SourcesPanel({
         : t("sales_intel.not_synced"),
     },
     {
+      title: t("sources.cards.follow_up_title"),
+      detail: t("sources.cards.follow_up_detail", {
+        count: followUpRecords.length,
+      }),
+    },
+    {
       title: t("sources.cards.search_title"),
       detail: salesIntelData.todaySearchItems?.length
         ? t("sources.cards.search_detail", {
@@ -738,19 +740,60 @@ function SourcesPanel({
   ];
 
   return (
-    <Card title={t("sources.title")}>
-      <Typography.Paragraph type="secondary">{t("sources.description")}</Typography.Paragraph>
-      <div className="divide-y divide-(--color-line)">
-        {items.map((item) => (
-          <div key={item.title} className="py-4 first:pt-0 last:pb-0">
-            <Space orientation="vertical" size={4} style={{ display: "flex" }}>
-              <Typography.Text strong>{item.title}</Typography.Text>
-              <Typography.Text type="secondary">{item.detail}</Typography.Text>
-            </Space>
-          </div>
-        ))}
-      </div>
-    </Card>
+    <div className="space-y-6">
+      <Card title={t("sources.title")}>
+        <Typography.Paragraph type="secondary">{t("sources.description")}</Typography.Paragraph>
+        <div className="divide-y divide-(--color-line)">
+          {items.map((item) => (
+            <div key={item.title} className="py-4 first:pt-0 last:pb-0">
+              <Space orientation="vertical" size={4} style={{ display: "flex" }}>
+                <Typography.Text strong>{item.title}</Typography.Text>
+                <Typography.Text type="secondary">{item.detail}</Typography.Text>
+              </Space>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title={t("sources.health.title")}>
+        <div className="grid gap-3 md:grid-cols-3">
+          <MetricCard
+            label={t("sources.health.api_status")}
+            value={apiHealth?.ok ? t("sources.health.online") : t("sources.health.unknown")}
+            detail={apiHealth?.ok ? t("sources.health.api_ok") : t("sources.health.api_unknown")}
+          />
+          <MetricCard
+            label={t("sources.health.document_count")}
+            value={healthDocuments.length}
+            detail={t("sources.health.document_count_detail")}
+          />
+          <MetricCard
+            label={t("sources.health.follow_up_records")}
+            value={followUpRecords.length}
+            detail={t("sources.health.follow_up_records_detail")}
+          />
+        </div>
+
+        <div className="mt-5 divide-y divide-(--color-line)">
+          {healthDocuments.length ? (
+            healthDocuments.map((item) => (
+              <div
+                key={`${item.key}-${item.source}`}
+                className="grid gap-2 py-3 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,1fr)]"
+              >
+                <Typography.Text strong>{item.key}</Typography.Text>
+                <Typography.Text type="secondary">{item.source}</Typography.Text>
+                <Typography.Text type="secondary">
+                  {formatDisplayUpdatedAt(item.updated_at)}
+                </Typography.Text>
+              </div>
+            ))
+          ) : (
+            <Empty description={t("sources.health.empty_documents")} />
+          )}
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -761,6 +804,8 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
   const [salesIntelData, setSalesIntelData] = useState<SalesIntelData>(fallbackSalesIntelData);
   const [competitorData, setCompetitorData] = useState<CompetitorData>(fallbackCompetitorData);
   const [adminIndex, setAdminIndex] = useState<ChinaAdminIndex>(fallbackAdminIndex);
+  const [followUpRecords, setFollowUpRecords] = useState<FollowUpRecord[]>([]);
+  const [apiHealth, setApiHealth] = useState<ApiHealthPayload | null>(null);
   const [selectedMapCompetitorKey, setSelectedMapCompetitorKey] = useState<string | null>(null);
   const [expandedCompetitorKey, setExpandedCompetitorKey] = useState<string | null>(null);
   const [priorityCompetitorKey, setPriorityCompetitorKey] = useState<string | null>(null);
@@ -775,15 +820,22 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
     async function loadData() {
       setIsInitialLoading(true);
 
-      const [salesResult, competitorResult, adminIndexResult] = await Promise.allSettled([
-        loadJsonWithFallback<SalesIntelData>(createRemoteOnlyDataSources("/api/sales/intel")),
-        loadJsonWithFallback<CompetitorData>(
-          createDataSources("/api/competitors", "/competitors.json")
-        ),
-        loadJsonWithFallback<ChinaAdminIndex>(
-          createDataSources("/api/admin/divisions", "/china-admin-divisions.json")
-        ),
-      ]);
+      const [salesResult, competitorResult, adminIndexResult, followUpResult, healthResult] =
+        await Promise.allSettled([
+          loadJsonWithFallback<SalesIntelData>(createRemoteOnlyDataSources("/api/sales/intel")),
+          loadJsonWithFallback<CompetitorData>(
+            createDataSources("/api/competitors", "/competitors.json")
+          ),
+          loadJsonWithFallback<ChinaAdminIndex>(
+            createDataSources("/api/admin/divisions", "/china-admin-divisions.json")
+          ),
+          loadJsonWithFallback<FollowUpRecordsPayload>(
+            createRemoteOnlyDataSources("/api/follow-ups")
+          ),
+          view === "sources"
+            ? loadJsonWithFallback<ApiHealthPayload>(createRemoteOnlyDataSources("/api/health"))
+            : Promise.resolve(null),
+        ]);
 
       if (!active) {
         return;
@@ -798,6 +850,12 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       setAdminIndex(
         adminIndexResult.status === "fulfilled" ? adminIndexResult.value : fallbackAdminIndex
       );
+      setFollowUpRecords(
+        followUpResult.status === "fulfilled" && Array.isArray(followUpResult.value.items)
+          ? followUpResult.value.items
+          : []
+      );
+      setApiHealth(healthResult.status === "fulfilled" ? (healthResult.value ?? null) : null);
       setIsInitialLoading(false);
     }
 
@@ -809,13 +867,15 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       setSalesIntelData(fallbackSalesIntelData);
       setCompetitorData(fallbackCompetitorData);
       setAdminIndex(fallbackAdminIndex);
+      setFollowUpRecords([]);
+      setApiHealth(null);
       setIsInitialLoading(false);
     });
 
     return () => {
       active = false;
     };
-  }, [fallbackCompetitorData, fallbackSalesIntelData]);
+  }, [fallbackCompetitorData, fallbackSalesIntelData, view]);
 
   const visibleCompetitors = useMemo(() => {
     if (!selectedCities.length) {
@@ -891,17 +951,6 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       visibleCompetitors.length,
     ]
   );
-  const followUpSuggestions = useMemo(
-    () =>
-      companyEntries.slice(0, 6).map((entry) => ({
-        title: entry.companyName,
-        summary: entry.latestSummary,
-        meta: `${entry.city || t("companies.unknown_city")} · ${t("companies.signal_count", {
-          count: entry.signalCount,
-        })}`,
-      })),
-    [companyEntries, t]
-  );
   const viewConfig = {
     overview: {
       icon: <RadarChartOutlined />,
@@ -974,7 +1023,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
           </>
         );
       case "companies":
-        return <CompanyLibraryPanel entries={companyEntries} />;
+        return <CompanyLibraryPanel entries={companyEntries} records={followUpRecords} />;
       case "competitors":
         return (
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
@@ -1022,9 +1071,32 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
           </div>
         );
       case "follow-ups":
-        return <FollowUpPanel items={followUpSuggestions} />;
+        return (
+          <FollowUpManagementPanel
+            entries={companyEntries}
+            records={followUpRecords}
+            onSaveRecord={(record) => {
+              setFollowUpRecords((current) => {
+                const exists = current.some((item) => item.companyId === record.companyId);
+
+                if (!exists) {
+                  return [record, ...current];
+                }
+
+                return current.map((item) => (item.companyId === record.companyId ? record : item));
+              });
+            }}
+          />
+        );
       case "sources":
-        return <SourcesPanel salesIntelData={salesIntelData} competitorData={competitorData} />;
+        return (
+          <SourcesPanel
+            salesIntelData={salesIntelData}
+            competitorData={competitorData}
+            followUpRecords={followUpRecords}
+            apiHealth={apiHealth}
+          />
+        );
       default:
         return (
           <Card>

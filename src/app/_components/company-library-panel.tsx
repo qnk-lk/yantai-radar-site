@@ -11,9 +11,10 @@ import {
   SearchOutlined,
 } from "@ant-design/icons";
 import { Card, Empty, Input, Space, Statistic, Tag, Typography } from "antd";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { FollowUpRecord, FollowUpStage } from "./follow-up-types";
 import type { SalesIntelItem } from "./sales-intel-types";
 
 type CompanyJob = NonNullable<SalesIntelItem["allJobs"]>[number];
@@ -101,6 +102,18 @@ function strengthScore(value: string) {
 
 function formatDisplayUpdatedAt(value: string) {
   return compactText(value).replace(/\s*CST$/u, "");
+}
+
+function getFollowUpStageLabel(t: (key: string) => string, stage: FollowUpStage) {
+  if (stage === "priority") {
+    return t("companies.profile.stages.priority");
+  }
+
+  if (stage === "watch") {
+    return t("companies.profile.stages.watch");
+  }
+
+  return t("companies.profile.stages.screening");
 }
 
 function createJobIdentity(job: CompanyJob) {
@@ -402,10 +415,12 @@ function FollowUpReserveCard({
   stageLabel,
   stageColor,
   nextAction,
+  record,
 }: {
   stageLabel: string;
   stageColor: string;
   nextAction: string;
+  record?: FollowUpRecord | null;
 }) {
   const { t } = useTranslation();
 
@@ -418,7 +433,25 @@ function FollowUpReserveCard({
         </div>
         <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
           <Typography.Text type="secondary">{t("companies.profile.owner_label")}</Typography.Text>
-          <Typography.Text>{t("companies.profile.owner_empty")}</Typography.Text>
+          <Typography.Text>{record?.owner || t("companies.profile.owner_empty")}</Typography.Text>
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
+          <Typography.Text type="secondary">
+            {t("companies.profile.next_reminder_label")}
+          </Typography.Text>
+          <Typography.Text>
+            {formatDisplayUpdatedAt(record?.nextReminderAt ?? "") ||
+              t("companies.profile.next_reminder_empty")}
+          </Typography.Text>
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
+          <Typography.Text type="secondary">
+            {t("companies.profile.last_followed_label")}
+          </Typography.Text>
+          <Typography.Text>
+            {formatDisplayUpdatedAt(record?.lastFollowedAt ?? "") ||
+              t("companies.profile.last_followed_empty")}
+          </Typography.Text>
         </div>
         <div className="rounded-[1rem] border border-(--color-line) bg-(--color-card-soft) px-3 py-3 md:col-span-2">
           <Typography.Text type="secondary">
@@ -431,7 +464,7 @@ function FollowUpReserveCard({
         <div className="rounded-[1rem] border border-dashed border-(--color-line) bg-white/45 px-3 py-3 md:col-span-2">
           <Typography.Text type="secondary">{t("companies.profile.note_label")}</Typography.Text>
           <Typography.Paragraph style={{ marginTop: 6, marginBottom: 0 }}>
-            {t("companies.profile.note_empty")}
+            {record?.note || t("companies.profile.note_empty")}
           </Typography.Paragraph>
         </div>
       </div>
@@ -597,7 +630,13 @@ function JobPreviewList({ jobs }: { jobs: CompanyJob[] }) {
   );
 }
 
-function CompanyProfile({ entry }: { entry: CompanyLibraryEntry | null }) {
+function CompanyProfile({
+  entry,
+  followUpRecord,
+}: {
+  entry: CompanyLibraryEntry | null;
+  followUpRecord?: FollowUpRecord | null;
+}) {
   const { t } = useTranslation();
 
   if (!entry) {
@@ -609,13 +648,8 @@ function CompanyProfile({ entry }: { entry: CompanyLibraryEntry | null }) {
   }
 
   const jobs = collectCompanyJobs(entry);
-  const followUpStage = resolveCompanyStage(entry);
-  const followUpStageLabel =
-    followUpStage === "priority"
-      ? t("companies.profile.stages.priority")
-      : followUpStage === "watch"
-        ? t("companies.profile.stages.watch")
-        : t("companies.profile.stages.screening");
+  const followUpStage = followUpRecord?.stage ?? resolveCompanyStage(entry);
+  const followUpStageLabel = getFollowUpStageLabel(t, followUpStage);
   const followUpStageColor = followUpStage === "priority" ? "orange" : "blue";
   const nextAction = getLatestAction(entry);
   const firstSignalAt = getEntryFirstSignalAt(entry);
@@ -750,6 +784,7 @@ function CompanyProfile({ entry }: { entry: CompanyLibraryEntry | null }) {
               stageLabel={followUpStageLabel}
               stageColor={followUpStageColor}
               nextAction={nextAction}
+              record={followUpRecord}
             />
             <RiskPanel riskItems={riskItems} />
           </div>
@@ -803,12 +838,37 @@ function CompanyProfile({ entry }: { entry: CompanyLibraryEntry | null }) {
   );
 }
 
-export function CompanyLibraryPanel({ entries }: { entries: CompanyLibraryEntry[] }) {
+export function CompanyLibraryPanel({
+  entries,
+  records,
+}: {
+  entries: CompanyLibraryEntry[];
+  records: FollowUpRecord[];
+}) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(entries[0]?.id ?? null);
   const totalSignalCount = useMemo(() => getEntryTotalSignalCount(entries), [entries]);
   const totalJobCount = useMemo(() => getEntryTotalJobCount(entries), [entries]);
+  const followUpRecordMap = useMemo(
+    () => new Map(records.map((record) => [record.companyId, record])),
+    [records]
+  );
+
+  useEffect(() => {
+    const targetId = new URLSearchParams(window.location.search).get("company");
+
+    if (!targetId || !entries.some((entry) => entry.id === targetId)) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      setQuery("");
+      setSelectedId(targetId);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [entries]);
 
   const filteredEntries = useMemo(() => {
     if (!query.trim()) {
@@ -840,6 +900,7 @@ export function CompanyLibraryPanel({ entries }: { entries: CompanyLibraryEntry[
       ? selectedId
       : (filteredEntries[0]?.id ?? null);
   const activeEntry = filteredEntries.find((entry) => entry.id === resolvedSelectedId) ?? null;
+  const activeFollowUpRecord = activeEntry ? followUpRecordMap.get(activeEntry.id) : null;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(19rem,0.76fr)_minmax(0,1.24fr)]">
@@ -896,7 +957,7 @@ export function CompanyLibraryPanel({ entries }: { entries: CompanyLibraryEntry[
         </Space>
       </Card>
 
-      <CompanyProfile entry={activeEntry} />
+      <CompanyProfile entry={activeEntry} followUpRecord={activeFollowUpRecord} />
     </div>
   );
 }
