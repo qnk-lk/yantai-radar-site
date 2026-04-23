@@ -10,6 +10,9 @@
   --color-muted: #675d52;
   --color-line: #dac8ac;
   --color-accent: #9e4520;
+  --font-geist-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC",
+    sans-serif;
+  --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 @theme inline {
