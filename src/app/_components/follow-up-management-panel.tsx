@@ -28,7 +28,13 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CompanyLibraryEntry } from "./company-library-panel";
-import type { FollowUpRecord, FollowUpStage } from "./follow-up-types";
+import type {
+  FollowUpCommunicationMethod,
+  FollowUpContactResult,
+  FollowUpDealStage,
+  FollowUpRecord,
+  FollowUpStage,
+} from "./follow-up-types";
 
 type FollowUpBoardEntry = CompanyLibraryEntry & {
   stage: FollowUpStage;
@@ -43,10 +49,38 @@ type FollowUpBoardEntry = CompanyLibraryEntry & {
 type FollowUpFormValues = {
   stage: FollowUpStage;
   owner: string;
+  communicationMethod: FollowUpCommunicationMethod;
+  contactResult: FollowUpContactResult;
+  nextAction: string;
+  dealStage: FollowUpDealStage;
   nextReminderAt: string;
   note: string;
   lastFollowedAt: string;
 };
+
+const communicationMethodValues: FollowUpCommunicationMethod[] = [
+  "phone",
+  "wechat",
+  "visit",
+  "email",
+  "other",
+];
+const contactResultValues: FollowUpContactResult[] = [
+  "not_contacted",
+  "connected",
+  "interested",
+  "no_need",
+  "pending",
+  "invalid",
+];
+const dealStageValues: FollowUpDealStage[] = [
+  "lead",
+  "qualified",
+  "contacted",
+  "proposal",
+  "won",
+  "lost",
+];
 
 function compactText(value: string) {
   return String(value || "")
@@ -193,6 +227,10 @@ async function saveFollowUpRecord(entry: FollowUpBoardEntry, values: FollowUpFor
       city: entry.city,
       stage: values.stage,
       owner: values.owner,
+      communicationMethod: values.communicationMethod,
+      contactResult: values.contactResult,
+      nextAction: values.nextAction,
+      dealStage: values.dealStage,
       nextReminderAt: values.nextReminderAt,
       note: values.note,
       lastFollowedAt: values.lastFollowedAt,
@@ -235,6 +273,10 @@ function FollowUpCompanyCard({
     form.setFieldsValue({
       stage: record?.stage ?? entry.stage,
       owner: record?.owner ?? "",
+      communicationMethod: record?.communicationMethod ?? "",
+      contactResult: record?.contactResult ?? "",
+      nextAction: record?.nextAction ?? "",
+      dealStage: record?.dealStage ?? "",
       nextReminderAt: record?.nextReminderAt ?? "",
       note: record?.note ?? "",
       lastFollowedAt: record?.lastFollowedAt ?? "",
@@ -362,6 +404,34 @@ function FollowUpCompanyCard({
           </Typography.Text>
         </div>
         <div className="rounded-[1rem] bg-(--color-card-soft) p-3">
+          <Typography.Text type="secondary">{t("follow_ups.fields.deal_stage")}</Typography.Text>
+          <Typography.Text strong className="block">
+            {record?.dealStage
+              ? t(`follow_ups.deal_stages.${record.dealStage}`)
+              : t("follow_ups.values.no_deal_stage")}
+          </Typography.Text>
+        </div>
+        <div className="rounded-[1rem] bg-(--color-card-soft) p-3">
+          <Typography.Text type="secondary">
+            {t("follow_ups.fields.communication_method")}
+          </Typography.Text>
+          <Typography.Text strong className="block">
+            {record?.communicationMethod
+              ? t(`follow_ups.communication_methods.${record.communicationMethod}`)
+              : t("follow_ups.values.no_communication_method")}
+          </Typography.Text>
+        </div>
+        <div className="rounded-[1rem] bg-(--color-card-soft) p-3">
+          <Typography.Text type="secondary">
+            {t("follow_ups.fields.contact_result")}
+          </Typography.Text>
+          <Typography.Text strong className="block">
+            {record?.contactResult
+              ? t(`follow_ups.contact_results.${record.contactResult}`)
+              : t("follow_ups.values.no_contact_result")}
+          </Typography.Text>
+        </div>
+        <div className="rounded-[1rem] bg-(--color-card-soft) p-3">
           <Typography.Text type="secondary">{t("follow_ups.fields.next_reminder")}</Typography.Text>
           <Typography.Text strong className="block">
             {formatDisplayUpdatedAt(record?.nextReminderAt ?? "") ||
@@ -379,6 +449,14 @@ function FollowUpCompanyCard({
           <Typography.Text type="secondary">{t("follow_ups.fields.manual_note")}</Typography.Text>
           <Typography.Text strong ellipsis title={record?.note} className="block">
             {record?.note || t("follow_ups.values.no_note")}
+          </Typography.Text>
+        </div>
+        <div className="rounded-[1rem] bg-(--color-card-soft) p-3 xl:col-span-2">
+          <Typography.Text type="secondary">
+            {t("follow_ups.fields.manual_next_action")}
+          </Typography.Text>
+          <Typography.Text strong ellipsis title={record?.nextAction} className="block">
+            {record?.nextAction || t("follow_ups.values.no_next_action")}
           </Typography.Text>
         </div>
       </div>
@@ -410,8 +488,46 @@ function FollowUpCompanyCard({
           <Form.Item name="owner" label={t("follow_ups.editor.owner")}>
             <Input placeholder={t("follow_ups.editor.owner_placeholder")} />
           </Form.Item>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Form.Item
+              name="communicationMethod"
+              label={t("follow_ups.editor.communication_method")}
+            >
+              <Select
+                allowClear
+                placeholder={t("follow_ups.editor.communication_method_placeholder")}
+                options={communicationMethodValues.map((value) => ({
+                  value,
+                  label: t(`follow_ups.communication_methods.${value}`),
+                }))}
+              />
+            </Form.Item>
+            <Form.Item name="contactResult" label={t("follow_ups.editor.contact_result")}>
+              <Select
+                allowClear
+                placeholder={t("follow_ups.editor.contact_result_placeholder")}
+                options={contactResultValues.map((value) => ({
+                  value,
+                  label: t(`follow_ups.contact_results.${value}`),
+                }))}
+              />
+            </Form.Item>
+            <Form.Item name="dealStage" label={t("follow_ups.editor.deal_stage")}>
+              <Select
+                allowClear
+                placeholder={t("follow_ups.editor.deal_stage_placeholder")}
+                options={dealStageValues.map((value) => ({
+                  value,
+                  label: t(`follow_ups.deal_stages.${value}`),
+                }))}
+              />
+            </Form.Item>
+          </div>
           <Form.Item name="nextReminderAt" label={t("follow_ups.editor.next_reminder")}>
             <Input placeholder={t("follow_ups.editor.time_placeholder")} />
+          </Form.Item>
+          <Form.Item name="nextAction" label={t("follow_ups.editor.next_action")}>
+            <Input.TextArea rows={2} placeholder={t("follow_ups.editor.next_action_placeholder")} />
           </Form.Item>
           <Form.Item label={t("follow_ups.editor.last_followed")}>
             <Space.Compact style={{ width: "100%" }}>
@@ -536,7 +652,7 @@ export function FollowUpManagementPanel({
   const watchEntries = boardEntries.filter((entry) => entry.stage === "watch");
   const screeningEntries = boardEntries.filter((entry) => entry.stage === "screening");
   const unassignedCount = boardEntries.filter((entry) => !entry.followUpRecord?.owner).length;
-  const assignedCount = boardEntries.length - unassignedCount;
+  const assignedCount = records.filter((record) => record.owner).length;
   const hasFollowUpRecords = records.length > 0;
 
   return (

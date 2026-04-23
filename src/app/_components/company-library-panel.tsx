@@ -437,6 +437,36 @@ function FollowUpReserveCard({
         </div>
         <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
           <Typography.Text type="secondary">
+            {t("companies.profile.deal_stage_label")}
+          </Typography.Text>
+          <Typography.Text>
+            {record?.dealStage
+              ? t(`follow_ups.deal_stages.${record.dealStage}`)
+              : t("companies.profile.deal_stage_empty")}
+          </Typography.Text>
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
+          <Typography.Text type="secondary">
+            {t("companies.profile.communication_method_label")}
+          </Typography.Text>
+          <Typography.Text>
+            {record?.communicationMethod
+              ? t(`follow_ups.communication_methods.${record.communicationMethod}`)
+              : t("companies.profile.communication_method_empty")}
+          </Typography.Text>
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
+          <Typography.Text type="secondary">
+            {t("companies.profile.contact_result_label")}
+          </Typography.Text>
+          <Typography.Text>
+            {record?.contactResult
+              ? t(`follow_ups.contact_results.${record.contactResult}`)
+              : t("companies.profile.contact_result_empty")}
+          </Typography.Text>
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-(--color-line) bg-white/65 px-3 py-3">
+          <Typography.Text type="secondary">
             {t("companies.profile.next_reminder_label")}
           </Typography.Text>
           <Typography.Text>
@@ -458,7 +488,7 @@ function FollowUpReserveCard({
             {t("companies.profile.next_action_label")}
           </Typography.Text>
           <Typography.Paragraph style={{ marginTop: 6, marginBottom: 0 }}>
-            {nextAction || t("companies.profile.next_action_empty")}
+            {record?.nextAction || nextAction || t("companies.profile.next_action_empty")}
           </Typography.Paragraph>
         </div>
         <div className="rounded-[1rem] border border-dashed border-(--color-line) bg-white/45 px-3 py-3 md:col-span-2">

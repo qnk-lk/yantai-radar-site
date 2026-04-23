@@ -14,6 +14,29 @@ const COMPETITOR_CITY_PRIORITY = ["烟台", "青岛"];
 const COMPETITOR_DISTANCE_PRIORITY = ["烟台本地", "青岛重点"];
 const DEFAULT_COMPETITOR_UPDATE_LIMIT = 40;
 const FOLLOW_UP_STAGES = new Set(["priority", "watch", "screening"]);
+const FOLLOW_UP_COMMUNICATION_METHODS = new Set(["phone", "wechat", "visit", "email", "other"]);
+const FOLLOW_UP_CONTACT_RESULTS = new Set([
+  "not_contacted",
+  "connected",
+  "interested",
+  "no_need",
+  "pending",
+  "invalid",
+]);
+const FOLLOW_UP_DEAL_STAGES = new Set([
+  "lead",
+  "qualified",
+  "contacted",
+  "proposal",
+  "won",
+  "lost",
+]);
+const FOLLOW_UP_EXTRA_COLUMNS = [
+  ["communication_method", "TEXT NOT NULL DEFAULT ''"],
+  ["contact_result", "TEXT NOT NULL DEFAULT ''"],
+  ["next_action", "TEXT NOT NULL DEFAULT ''"],
+  ["deal_stage", "TEXT NOT NULL DEFAULT ''"],
+];
 
 export const DOCUMENT_DEFINITIONS = {
   radar: {
@@ -216,6 +239,11 @@ function normalizeFollowUpStage(value) {
   return FOLLOW_UP_STAGES.has(stage) ? stage : "screening";
 }
 
+function normalizeEnumValue(value, allowedValues) {
+  const normalized = normalizeText(value);
+  return allowedValues.has(normalized) ? normalized : "";
+}
+
 function normalizeFollowUpRecord(row) {
   return {
     companyId: row.company_id,
@@ -223,6 +251,10 @@ function normalizeFollowUpRecord(row) {
     city: row.city,
     stage: row.stage,
     owner: row.owner,
+    communicationMethod: row.communication_method,
+    contactResult: row.contact_result,
+    nextAction: row.next_action,
+    dealStage: row.deal_stage,
     nextReminderAt: row.next_reminder_at,
     note: row.note,
     lastFollowedAt: row.last_followed_at,
@@ -245,11 +277,28 @@ function normalizeFollowUpInput(input) {
     city: normalizeText(input?.city),
     stage: normalizeFollowUpStage(input?.stage),
     owner: normalizeText(input?.owner),
+    communicationMethod: normalizeEnumValue(
+      input?.communicationMethod,
+      FOLLOW_UP_COMMUNICATION_METHODS
+    ),
+    contactResult: normalizeEnumValue(input?.contactResult, FOLLOW_UP_CONTACT_RESULTS),
+    nextAction: normalizeText(input?.nextAction),
+    dealStage: normalizeEnumValue(input?.dealStage, FOLLOW_UP_DEAL_STAGES),
     nextReminderAt: normalizeText(input?.nextReminderAt),
     note: normalizeText(input?.note),
     lastFollowedAt: normalizeText(input?.lastFollowedAt),
     updatedAt: normalizeText(input?.updatedAt, now),
   };
+}
+
+function ensureTableColumn(db, tableName, columnName, columnDefinition) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+
+  if (columns.some((column) => column.name === columnName)) {
+    return;
+  }
+
+  db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
 }
 
 function cityPriority(city) {
@@ -814,6 +863,10 @@ export function ensureSchema(db) {
       city TEXT NOT NULL,
       stage TEXT NOT NULL,
       owner TEXT NOT NULL DEFAULT '',
+      communication_method TEXT NOT NULL DEFAULT '',
+      contact_result TEXT NOT NULL DEFAULT '',
+      next_action TEXT NOT NULL DEFAULT '',
+      deal_stage TEXT NOT NULL DEFAULT '',
       next_reminder_at TEXT NOT NULL DEFAULT '',
       note TEXT NOT NULL DEFAULT '',
       last_followed_at TEXT NOT NULL DEFAULT '',
@@ -836,6 +889,10 @@ export function ensureSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_follow_up_records_reminder
       ON follow_up_records (next_reminder_at, updated_at DESC);
   `);
+
+  for (const [columnName, columnDefinition] of FOLLOW_UP_EXTRA_COLUMNS) {
+    ensureTableColumn(db, "follow_up_records", columnName, columnDefinition);
+  }
 }
 
 export function hasDocument(db, key) {
@@ -939,6 +996,10 @@ export function readFollowUpRecords(db) {
           city,
           stage,
           owner,
+          communication_method,
+          contact_result,
+          next_action,
+          deal_stage,
           next_reminder_at,
           note,
           last_followed_at,
@@ -962,6 +1023,10 @@ export function readFollowUpRecord(db, companyId) {
           city,
           stage,
           owner,
+          communication_method,
+          contact_result,
+          next_action,
+          deal_stage,
           next_reminder_at,
           note,
           last_followed_at,
@@ -989,18 +1054,26 @@ export function upsertFollowUpRecord(db, input) {
         city,
         stage,
         owner,
+        communication_method,
+        contact_result,
+        next_action,
+        deal_stage,
         next_reminder_at,
         note,
         last_followed_at,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(company_id) DO UPDATE SET
         company_name = excluded.company_name,
         city = excluded.city,
         stage = excluded.stage,
         owner = excluded.owner,
+        communication_method = excluded.communication_method,
+        contact_result = excluded.contact_result,
+        next_action = excluded.next_action,
+        deal_stage = excluded.deal_stage,
         next_reminder_at = excluded.next_reminder_at,
         note = excluded.note,
         last_followed_at = excluded.last_followed_at,
@@ -1012,6 +1085,10 @@ export function upsertFollowUpRecord(db, input) {
     record.city,
     record.stage,
     record.owner,
+    record.communicationMethod,
+    record.contactResult,
+    record.nextAction,
+    record.dealStage,
     record.nextReminderAt,
     record.note,
     record.lastFollowedAt,

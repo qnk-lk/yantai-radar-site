@@ -920,6 +920,25 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
     () => buildCompanyLibraryEntries(salesIntelData.feed),
     [salesIntelData.feed]
   );
+  const followUpCompanyEntries = useMemo<CompanyLibraryEntry[]>(() => {
+    const existingCompanyIds = new Set(companyEntries.map((entry) => entry.id));
+    const recordOnlyEntries = followUpRecords
+      .filter((record) => !existingCompanyIds.has(record.companyId))
+      .map((record) => ({
+        id: record.companyId,
+        companyName: record.companyName || record.companyId.split("::")[0] || record.companyId,
+        city: record.city,
+        latestRetrievedAt: record.lastFollowedAt || record.nextReminderAt || record.updatedAt,
+        latestSummary: record.nextAction || record.note || t("follow_ups.record_only_summary"),
+        sourcePlatforms: [],
+        signalCount: 0,
+        allJobsCount: 0,
+        strongest: "",
+        items: [],
+      }));
+
+    return [...companyEntries, ...recordOnlyEntries];
+  }, [companyEntries, followUpRecords, t]);
   const heroMetrics = useMemo(
     () => [
       {
@@ -1023,7 +1042,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
           </>
         );
       case "companies":
-        return <CompanyLibraryPanel entries={companyEntries} records={followUpRecords} />;
+        return <CompanyLibraryPanel entries={followUpCompanyEntries} records={followUpRecords} />;
       case "competitors":
         return (
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
@@ -1073,7 +1092,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       case "follow-ups":
         return (
           <FollowUpManagementPanel
-            entries={companyEntries}
+            entries={followUpCompanyEntries}
             records={followUpRecords}
             onSaveRecord={(record) => {
               setFollowUpRecords((current) => {
