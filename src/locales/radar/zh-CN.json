@@ -297,12 +297,24 @@
     "empty_stage": "当前阶段没有企业。",
     "future_title": "后续闭环方向",
     "future_description": "下一阶段可以继续补沟通记录、触达结果、提醒规则和成交阶段，让情报线索真正进入销售动作闭环。",
+    "history": {
+      "title": "跟进时间线",
+      "count": "最近 {{count}} 条",
+      "empty": "暂无历史跟进记录，保存一次跟进后会自动沉淀到这里。",
+      "next_action": "下一步：{{value}}"
+    },
     "stages": {
       "priority": "优先跟进",
       "watch": "持续观察",
       "screening": "初筛池"
     },
     "metrics": {
+      "today": "今日待跟进",
+      "today_detail": "下次提醒时间落在今天的企业。",
+      "overdue": "逾期未跟进",
+      "overdue_detail": "提醒时间早于今天，仍未更新跟进的企业。",
+      "interested": "有兴趣",
+      "interested_detail": "联系结果已标记为有兴趣的企业。",
       "priority": "优先跟进",
       "priority_detail": "强度高、信号多或岗位需求明显的企业。",
       "watch": "持续观察",
@@ -311,6 +323,20 @@
       "screening_detail": "目前只保留早期信号，暂不建议马上投入重跟进。",
       "unassigned": "未分配负责人",
       "unassigned_detail": "当前跟进状态还未接人工负责人，全部属于自动建议。"
+    },
+    "filters": {
+      "all_reminders": "全部提醒状态",
+      "all_owners": "全部负责人",
+      "all_stages": "全部阶段",
+      "all_contact_results": "全部联系结果",
+      "reset": "重置",
+      "result": "当前显示 {{count}} / {{total}} 家企业。",
+      "empty": "当前筛选条件下没有匹配企业。",
+      "reminder_states": {
+        "today": "今日待跟进",
+        "overdue": "逾期未跟进",
+        "unset": "未设置提醒"
+      }
     },
     "stage_sections": {
       "priority_title": "优先跟进",

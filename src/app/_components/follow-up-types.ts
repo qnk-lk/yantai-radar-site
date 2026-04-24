@@ -35,6 +35,24 @@ export type FollowUpRecord = {
   lastFollowedAt: string;
   createdAt: string;
   updatedAt: string;
+  events?: FollowUpEvent[];
+};
+
+export type FollowUpEvent = {
+  id: number;
+  companyId: string;
+  companyName: string;
+  city: string;
+  stage: FollowUpStage;
+  owner: string;
+  communicationMethod: FollowUpCommunicationMethod;
+  contactResult: FollowUpContactResult;
+  nextAction: string;
+  dealStage: FollowUpDealStage;
+  nextReminderAt: string;
+  note: string;
+  followedAt: string;
+  createdAt: string;
 };
 
 export type FollowUpRecordsPayload = {

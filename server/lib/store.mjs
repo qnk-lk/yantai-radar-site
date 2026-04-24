@@ -263,6 +263,25 @@ function normalizeFollowUpRecord(row) {
   };
 }
 
+function normalizeFollowUpEvent(row) {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    companyName: row.company_name,
+    city: row.city,
+    stage: row.stage,
+    owner: row.owner,
+    communicationMethod: row.communication_method,
+    contactResult: row.contact_result,
+    nextAction: row.next_action,
+    dealStage: row.deal_stage,
+    nextReminderAt: row.next_reminder_at,
+    note: row.note,
+    followedAt: row.followed_at,
+    createdAt: row.created_at,
+  };
+}
+
 function normalizeFollowUpInput(input) {
   const now = new Date().toISOString();
   const companyId = normalizeText(input?.companyId);
@@ -874,6 +893,23 @@ export function ensureSchema(db) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS follow_up_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id TEXT NOT NULL,
+      company_name TEXT NOT NULL,
+      city TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      owner TEXT NOT NULL DEFAULT '',
+      communication_method TEXT NOT NULL DEFAULT '',
+      contact_result TEXT NOT NULL DEFAULT '',
+      next_action TEXT NOT NULL DEFAULT '',
+      deal_stage TEXT NOT NULL DEFAULT '',
+      next_reminder_at TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      followed_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_competitor_master_active
       ON competitor_master (is_active, city, latest_rank);
 
@@ -888,6 +924,9 @@ export function ensureSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_follow_up_records_reminder
       ON follow_up_records (next_reminder_at, updated_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_follow_up_events_company
+      ON follow_up_events (company_id, created_at DESC, id DESC);
   `);
 
   for (const [columnName, columnDefinition] of FOLLOW_UP_EXTRA_COLUMNS) {
@@ -1010,7 +1049,10 @@ export function readFollowUpRecords(db) {
       `
     )
     .all()
-    .map(normalizeFollowUpRecord);
+    .map((row) => ({
+      ...normalizeFollowUpRecord(row),
+      events: readFollowUpEvents(db, row.company_id, 8),
+    }));
 }
 
 export function readFollowUpRecord(db, companyId) {
@@ -1038,7 +1080,45 @@ export function readFollowUpRecord(db, companyId) {
     )
     .get(normalizeText(companyId));
 
-  return row ? normalizeFollowUpRecord(row) : null;
+  return row
+    ? {
+        ...normalizeFollowUpRecord(row),
+        events: readFollowUpEvents(db, row.company_id, 20),
+      }
+    : null;
+}
+
+export function readFollowUpEvents(db, companyId, limit = 20) {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(100, Math.trunc(limit)))
+    : 20;
+
+  return db
+    .prepare(
+      `
+        SELECT
+          id,
+          company_id,
+          company_name,
+          city,
+          stage,
+          owner,
+          communication_method,
+          contact_result,
+          next_action,
+          deal_stage,
+          next_reminder_at,
+          note,
+          followed_at,
+          created_at
+        FROM follow_up_events
+        WHERE company_id = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+      `
+    )
+    .all(normalizeText(companyId), safeLimit)
+    .map(normalizeFollowUpEvent);
 }
 
 export function upsertFollowUpRecord(db, input) {
@@ -1046,55 +1126,99 @@ export function upsertFollowUpRecord(db, input) {
   const now = new Date().toISOString();
   const createdAt = now;
 
-  db.prepare(
-    `
-      INSERT INTO follow_up_records (
-        company_id,
-        company_name,
-        city,
-        stage,
-        owner,
-        communication_method,
-        contact_result,
-        next_action,
-        deal_stage,
-        next_reminder_at,
-        note,
-        last_followed_at,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(company_id) DO UPDATE SET
-        company_name = excluded.company_name,
-        city = excluded.city,
-        stage = excluded.stage,
-        owner = excluded.owner,
-        communication_method = excluded.communication_method,
-        contact_result = excluded.contact_result,
-        next_action = excluded.next_action,
-        deal_stage = excluded.deal_stage,
-        next_reminder_at = excluded.next_reminder_at,
-        note = excluded.note,
-        last_followed_at = excluded.last_followed_at,
-        updated_at = excluded.updated_at
-    `
-  ).run(
-    record.companyId,
-    record.companyName,
-    record.city,
-    record.stage,
-    record.owner,
-    record.communicationMethod,
-    record.contactResult,
-    record.nextAction,
-    record.dealStage,
-    record.nextReminderAt,
-    record.note,
-    record.lastFollowedAt,
-    createdAt,
-    record.updatedAt
-  );
+  db.exec("BEGIN");
+
+  try {
+    db.prepare(
+      `
+        INSERT INTO follow_up_records (
+          company_id,
+          company_name,
+          city,
+          stage,
+          owner,
+          communication_method,
+          contact_result,
+          next_action,
+          deal_stage,
+          next_reminder_at,
+          note,
+          last_followed_at,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(company_id) DO UPDATE SET
+          company_name = excluded.company_name,
+          city = excluded.city,
+          stage = excluded.stage,
+          owner = excluded.owner,
+          communication_method = excluded.communication_method,
+          contact_result = excluded.contact_result,
+          next_action = excluded.next_action,
+          deal_stage = excluded.deal_stage,
+          next_reminder_at = excluded.next_reminder_at,
+          note = excluded.note,
+          last_followed_at = excluded.last_followed_at,
+          updated_at = excluded.updated_at
+      `
+    ).run(
+      record.companyId,
+      record.companyName,
+      record.city,
+      record.stage,
+      record.owner,
+      record.communicationMethod,
+      record.contactResult,
+      record.nextAction,
+      record.dealStage,
+      record.nextReminderAt,
+      record.note,
+      record.lastFollowedAt,
+      createdAt,
+      record.updatedAt
+    );
+
+    db.prepare(
+      `
+        INSERT INTO follow_up_events (
+          company_id,
+          company_name,
+          city,
+          stage,
+          owner,
+          communication_method,
+          contact_result,
+          next_action,
+          deal_stage,
+          next_reminder_at,
+          note,
+          followed_at,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    ).run(
+      record.companyId,
+      record.companyName,
+      record.city,
+      record.stage,
+      record.owner,
+      record.communicationMethod,
+      record.contactResult,
+      record.nextAction,
+      record.dealStage,
+      record.nextReminderAt,
+      record.note,
+      record.lastFollowedAt || record.updatedAt,
+      now
+    );
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 
   return readFollowUpRecord(db, record.companyId);
 }

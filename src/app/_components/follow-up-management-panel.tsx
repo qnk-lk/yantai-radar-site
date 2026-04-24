@@ -5,7 +5,6 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   FireOutlined,
-  ProfileOutlined,
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import {
@@ -20,6 +19,7 @@ import {
   Space,
   Statistic,
   Tag,
+  Timeline,
   Typography,
   message,
 } from "antd";
@@ -28,10 +28,18 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CompanyLibraryEntry } from "./company-library-panel";
+import {
+  filterFollowUpEntries,
+  getFollowUpFilterStats,
+  getFollowUpOwners,
+  type FollowUpFilterState,
+  type FollowUpReminderState,
+} from "./follow-up-filtering";
 import type {
   FollowUpCommunicationMethod,
   FollowUpContactResult,
   FollowUpDealStage,
+  FollowUpEvent,
   FollowUpRecord,
   FollowUpStage,
 } from "./follow-up-types";
@@ -81,6 +89,7 @@ const dealStageValues: FollowUpDealStage[] = [
   "won",
   "lost",
 ];
+const reminderStateValues: FollowUpReminderState[] = ["today", "overdue", "unset"];
 
 function compactText(value: string) {
   return String(value || "")
@@ -216,6 +225,19 @@ function MetricCard({
   );
 }
 
+function renderEventTags(event: FollowUpEvent, t: ReturnType<typeof useTranslation>["t"]) {
+  const tags = [
+    event.stage ? t(`follow_ups.stages.${event.stage}`) : "",
+    event.communicationMethod
+      ? t(`follow_ups.communication_methods.${event.communicationMethod}`)
+      : "",
+    event.contactResult ? t(`follow_ups.contact_results.${event.contactResult}`) : "",
+    event.dealStage ? t(`follow_ups.deal_stages.${event.dealStage}`) : "",
+  ].filter(Boolean);
+
+  return tags.map((tag) => <Tag key={`${event.id}-${tag}`}>{tag}</Tag>);
+}
+
 async function saveFollowUpRecord(entry: FollowUpBoardEntry, values: FollowUpFormValues) {
   const response = await fetch(`/api/follow-ups/${encodeURIComponent(entry.id)}`, {
     method: "PUT",
@@ -268,6 +290,7 @@ function FollowUpCompanyCard({
   const sourcePlatforms = entry.sourcePlatforms.length
     ? entry.sourcePlatforms.join("、")
     : t("follow_ups.fields.no_platform");
+  const historyEvents = record?.events?.slice(0, 5) ?? [];
 
   function openEditor() {
     form.setFieldsValue({
@@ -461,6 +484,44 @@ function FollowUpCompanyCard({
         </div>
       </div>
 
+      <div className="mt-4 rounded-[1rem] border border-(--color-line) bg-white/58 p-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <Typography.Text strong>{t("follow_ups.history.title")}</Typography.Text>
+          <Typography.Text type="secondary">
+            {t("follow_ups.history.count", { count: historyEvents.length })}
+          </Typography.Text>
+        </div>
+        {historyEvents.length ? (
+          <Timeline
+            items={historyEvents.map((event) => ({
+              children: (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Typography.Text strong>
+                      {formatDisplayUpdatedAt(event.followedAt || event.createdAt)}
+                    </Typography.Text>
+                    {event.owner ? <Tag color="blue">{event.owner}</Tag> : null}
+                    {renderEventTags(event, t)}
+                  </div>
+                  {event.note ? (
+                    <Typography.Paragraph style={{ marginBottom: 0 }}>
+                      {event.note}
+                    </Typography.Paragraph>
+                  ) : null}
+                  {event.nextAction ? (
+                    <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                      {t("follow_ups.history.next_action", { value: event.nextAction })}
+                    </Typography.Paragraph>
+                  ) : null}
+                </div>
+              ),
+            }))}
+          />
+        ) : (
+          <Typography.Text type="secondary">{t("follow_ups.history.empty")}</Typography.Text>
+        )}
+      </div>
+
       <Modal
         title={t("follow_ups.editor.title", { company: entry.companyName })}
         open={isEditorOpen}
@@ -590,6 +651,12 @@ export function FollowUpManagementPanel({
   onSaveRecord: (record: FollowUpRecord) => void;
 }) {
   const { t } = useTranslation();
+  const [filters, setFilters] = useState<FollowUpFilterState>({
+    reminderState: "all",
+    owner: "",
+    stage: "all",
+    contactResult: "all",
+  });
   const boardEntries = useMemo<FollowUpBoardEntry[]>(() => {
     const recordMap = new Map(records.map((record) => [record.companyId, record]));
 
@@ -648,12 +715,39 @@ export function FollowUpManagementPanel({
         return compareLatestTimeDesc(left.latestRetrievedAt, right.latestRetrievedAt);
       });
   }, [entries, records, t]);
-  const priorityEntries = boardEntries.filter((entry) => entry.stage === "priority");
-  const watchEntries = boardEntries.filter((entry) => entry.stage === "watch");
-  const screeningEntries = boardEntries.filter((entry) => entry.stage === "screening");
+  const ownerOptions = useMemo(() => getFollowUpOwners(boardEntries), [boardEntries]);
+  const reminderStats = useMemo(() => getFollowUpFilterStats(boardEntries), [boardEntries]);
+  const filteredEntries = useMemo(
+    () => filterFollowUpEntries(boardEntries, filters),
+    [boardEntries, filters]
+  );
+  const priorityEntries = filteredEntries.filter((entry) => entry.stage === "priority");
+  const watchEntries = filteredEntries.filter((entry) => entry.stage === "watch");
+  const screeningEntries = filteredEntries.filter((entry) => entry.stage === "screening");
   const unassignedCount = boardEntries.filter((entry) => !entry.followUpRecord?.owner).length;
   const assignedCount = records.filter((record) => record.owner).length;
   const hasFollowUpRecords = records.length > 0;
+  const hasActiveFilters =
+    filters.reminderState !== "all" ||
+    filters.owner ||
+    filters.stage !== "all" ||
+    filters.contactResult !== "all";
+
+  function updateFilter(nextFilters: Partial<FollowUpFilterState>) {
+    setFilters((current) => ({
+      ...current,
+      ...nextFilters,
+    }));
+  }
+
+  function resetFilters() {
+    setFilters({
+      reminderState: "all",
+      owner: "",
+      stage: "all",
+      contactResult: "all",
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -680,22 +774,22 @@ export function FollowUpManagementPanel({
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          icon={<FireOutlined />}
-          label={t("follow_ups.metrics.priority")}
-          value={priorityEntries.length}
-          detail={t("follow_ups.metrics.priority_detail")}
+          icon={<ClockCircleOutlined />}
+          label={t("follow_ups.metrics.today")}
+          value={reminderStats.today}
+          detail={t("follow_ups.metrics.today_detail")}
         />
         <MetricCard
           icon={<ClockCircleOutlined />}
-          label={t("follow_ups.metrics.watch")}
-          value={watchEntries.length}
-          detail={t("follow_ups.metrics.watch_detail")}
+          label={t("follow_ups.metrics.overdue")}
+          value={reminderStats.overdue}
+          detail={t("follow_ups.metrics.overdue_detail")}
         />
         <MetricCard
-          icon={<ProfileOutlined />}
-          label={t("follow_ups.metrics.screening")}
-          value={screeningEntries.length}
-          detail={t("follow_ups.metrics.screening_detail")}
+          icon={<FireOutlined />}
+          label={t("follow_ups.metrics.interested")}
+          value={reminderStats.interested}
+          detail={t("follow_ups.metrics.interested_detail")}
         />
         <MetricCard
           icon={<SafetyCertificateOutlined />}
@@ -705,7 +799,61 @@ export function FollowUpManagementPanel({
         />
       </div>
 
-      {boardEntries.length ? (
+      <Card>
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+          <Select
+            value={filters.reminderState}
+            onChange={(value) => updateFilter({ reminderState: value })}
+            options={[
+              { value: "all", label: t("follow_ups.filters.all_reminders") },
+              ...reminderStateValues.map((value) => ({
+                value,
+                label: t(`follow_ups.filters.reminder_states.${value}`),
+              })),
+            ]}
+          />
+          <Select
+            value={filters.owner}
+            onChange={(value) => updateFilter({ owner: value })}
+            options={[
+              { value: "", label: t("follow_ups.filters.all_owners") },
+              ...ownerOptions.map((owner) => ({ value: owner, label: owner })),
+            ]}
+          />
+          <Select
+            value={filters.stage}
+            onChange={(value) => updateFilter({ stage: value })}
+            options={[
+              { value: "all", label: t("follow_ups.filters.all_stages") },
+              { value: "priority", label: t("follow_ups.stages.priority") },
+              { value: "watch", label: t("follow_ups.stages.watch") },
+              { value: "screening", label: t("follow_ups.stages.screening") },
+            ]}
+          />
+          <Select
+            value={filters.contactResult}
+            onChange={(value) => updateFilter({ contactResult: value })}
+            options={[
+              { value: "all", label: t("follow_ups.filters.all_contact_results") },
+              ...contactResultValues.map((value) => ({
+                value,
+                label: t(`follow_ups.contact_results.${value}`),
+              })),
+            ]}
+          />
+          <Button onClick={resetFilters} disabled={!hasActiveFilters}>
+            {t("follow_ups.filters.reset")}
+          </Button>
+        </div>
+        <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+          {t("follow_ups.filters.result", {
+            count: filteredEntries.length,
+            total: boardEntries.length,
+          })}
+        </Typography.Paragraph>
+      </Card>
+
+      {filteredEntries.length ? (
         <div className="grid gap-6">
           <StageColumn
             title={t("follow_ups.stage_sections.priority_title")}
@@ -728,7 +876,13 @@ export function FollowUpManagementPanel({
         </div>
       ) : (
         <Card>
-          <Empty description={t("follow_ups.empty_description")} />
+          <Empty
+            description={
+              boardEntries.length
+                ? t("follow_ups.filters.empty")
+                : t("follow_ups.empty_description")
+            }
+          />
         </Card>
       )}
 
