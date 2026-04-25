@@ -31,11 +31,14 @@ const FOLLOW_UP_DEAL_STAGES = new Set([
   "won",
   "lost",
 ]);
+const FOLLOW_UP_REMINDER_STATUSES = new Set(["open", "completed"]);
 const FOLLOW_UP_EXTRA_COLUMNS = [
   ["communication_method", "TEXT NOT NULL DEFAULT ''"],
   ["contact_result", "TEXT NOT NULL DEFAULT ''"],
   ["next_action", "TEXT NOT NULL DEFAULT ''"],
   ["deal_stage", "TEXT NOT NULL DEFAULT ''"],
+  ["reminder_status", "TEXT NOT NULL DEFAULT 'open'"],
+  ["completed_at", "TEXT NOT NULL DEFAULT ''"],
 ];
 
 export const DOCUMENT_DEFINITIONS = {
@@ -256,6 +259,8 @@ function normalizeFollowUpRecord(row) {
     nextAction: row.next_action,
     dealStage: row.deal_stage,
     nextReminderAt: row.next_reminder_at,
+    reminderStatus: row.reminder_status || "open",
+    completedAt: row.completed_at,
     note: row.note,
     lastFollowedAt: row.last_followed_at,
     createdAt: row.created_at,
@@ -276,6 +281,8 @@ function normalizeFollowUpEvent(row) {
     nextAction: row.next_action,
     dealStage: row.deal_stage,
     nextReminderAt: row.next_reminder_at,
+    reminderStatus: row.reminder_status || "open",
+    completedAt: row.completed_at,
     note: row.note,
     followedAt: row.followed_at,
     createdAt: row.created_at,
@@ -304,6 +311,9 @@ function normalizeFollowUpInput(input) {
     nextAction: normalizeText(input?.nextAction),
     dealStage: normalizeEnumValue(input?.dealStage, FOLLOW_UP_DEAL_STAGES),
     nextReminderAt: normalizeText(input?.nextReminderAt),
+    reminderStatus:
+      normalizeEnumValue(input?.reminderStatus, FOLLOW_UP_REMINDER_STATUSES) || "open",
+    completedAt: normalizeText(input?.completedAt),
     note: normalizeText(input?.note),
     lastFollowedAt: normalizeText(input?.lastFollowedAt),
     updatedAt: normalizeText(input?.updatedAt, now),
@@ -887,6 +897,8 @@ export function ensureSchema(db) {
       next_action TEXT NOT NULL DEFAULT '',
       deal_stage TEXT NOT NULL DEFAULT '',
       next_reminder_at TEXT NOT NULL DEFAULT '',
+      reminder_status TEXT NOT NULL DEFAULT 'open',
+      completed_at TEXT NOT NULL DEFAULT '',
       note TEXT NOT NULL DEFAULT '',
       last_followed_at TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
@@ -905,6 +917,8 @@ export function ensureSchema(db) {
       next_action TEXT NOT NULL DEFAULT '',
       deal_stage TEXT NOT NULL DEFAULT '',
       next_reminder_at TEXT NOT NULL DEFAULT '',
+      reminder_status TEXT NOT NULL DEFAULT 'open',
+      completed_at TEXT NOT NULL DEFAULT '',
       note TEXT NOT NULL DEFAULT '',
       followed_at TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
@@ -931,6 +945,7 @@ export function ensureSchema(db) {
 
   for (const [columnName, columnDefinition] of FOLLOW_UP_EXTRA_COLUMNS) {
     ensureTableColumn(db, "follow_up_records", columnName, columnDefinition);
+    ensureTableColumn(db, "follow_up_events", columnName, columnDefinition);
   }
 }
 
@@ -1040,6 +1055,8 @@ export function readFollowUpRecords(db) {
           next_action,
           deal_stage,
           next_reminder_at,
+          reminder_status,
+          completed_at,
           note,
           last_followed_at,
           created_at,
@@ -1070,6 +1087,8 @@ export function readFollowUpRecord(db, companyId) {
           next_action,
           deal_stage,
           next_reminder_at,
+          reminder_status,
+          completed_at,
           note,
           last_followed_at,
           created_at,
@@ -1108,6 +1127,8 @@ export function readFollowUpEvents(db, companyId, limit = 20) {
           next_action,
           deal_stage,
           next_reminder_at,
+          reminder_status,
+          completed_at,
           note,
           followed_at,
           created_at
@@ -1142,12 +1163,14 @@ export function upsertFollowUpRecord(db, input) {
           next_action,
           deal_stage,
           next_reminder_at,
+          reminder_status,
+          completed_at,
           note,
           last_followed_at,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(company_id) DO UPDATE SET
           company_name = excluded.company_name,
           city = excluded.city,
@@ -1159,6 +1182,8 @@ export function upsertFollowUpRecord(db, input) {
           deal_stage = excluded.deal_stage,
           next_reminder_at = excluded.next_reminder_at,
           note = excluded.note,
+          reminder_status = excluded.reminder_status,
+          completed_at = excluded.completed_at,
           last_followed_at = excluded.last_followed_at,
           updated_at = excluded.updated_at
       `
@@ -1173,6 +1198,8 @@ export function upsertFollowUpRecord(db, input) {
       record.nextAction,
       record.dealStage,
       record.nextReminderAt,
+      record.reminderStatus,
+      record.completedAt,
       record.note,
       record.lastFollowedAt,
       createdAt,
@@ -1192,11 +1219,13 @@ export function upsertFollowUpRecord(db, input) {
           next_action,
           deal_stage,
           next_reminder_at,
+          reminder_status,
+          completed_at,
           note,
           followed_at,
           created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     ).run(
       record.companyId,
@@ -1209,6 +1238,8 @@ export function upsertFollowUpRecord(db, input) {
       record.nextAction,
       record.dealStage,
       record.nextReminderAt,
+      record.reminderStatus,
+      record.completedAt,
       record.note,
       record.lastFollowedAt || record.updatedAt,
       now

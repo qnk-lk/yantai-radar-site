@@ -4,7 +4,7 @@ import type {
   FollowUpStage,
 } from "./follow-up-types";
 
-export type FollowUpReminderState = "all" | "today" | "overdue" | "unset";
+export type FollowUpReminderState = "all" | "today" | "overdue" | "unset" | "completed";
 
 export type FollowUpFilterState = {
   reminderState: FollowUpReminderState;
@@ -48,6 +48,10 @@ function isSameLocalDay(left: Date, right: Date) {
 }
 
 export function getReminderState(record: FollowUpRecord | undefined, now = new Date()) {
+  if (record?.reminderStatus === "completed") {
+    return "completed" satisfies FollowUpReminderState;
+  }
+
   const reminderAt = parseFollowUpDateTime(record?.nextReminderAt ?? "");
 
   if (!reminderAt) {
@@ -69,6 +73,11 @@ export function getFollowUpFilterStats(entries: FollowUpFilterEntry[], now = new
   return entries.reduce(
     (stats, entry) => {
       const reminderState = getReminderState(entry.followUpRecord, now);
+
+      if (reminderState === "completed") {
+        stats.completed += 1;
+        return stats;
+      }
 
       if (reminderState === "today") {
         stats.today += 1;
@@ -93,6 +102,7 @@ export function getFollowUpFilterStats(entries: FollowUpFilterEntry[], now = new
       overdue: 0,
       unassigned: 0,
       interested: 0,
+      completed: 0,
     }
   );
 }

@@ -4,7 +4,6 @@ import {
   ArrowRightOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  FireOutlined,
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import {
@@ -41,6 +40,7 @@ import type {
   FollowUpDealStage,
   FollowUpEvent,
   FollowUpRecord,
+  FollowUpReminderStatus,
   FollowUpStage,
 } from "./follow-up-types";
 
@@ -62,6 +62,8 @@ type FollowUpFormValues = {
   nextAction: string;
   dealStage: FollowUpDealStage;
   nextReminderAt: string;
+  reminderStatus: FollowUpReminderStatus;
+  completedAt: string;
   note: string;
   lastFollowedAt: string;
 };
@@ -89,7 +91,7 @@ const dealStageValues: FollowUpDealStage[] = [
   "won",
   "lost",
 ];
-const reminderStateValues: FollowUpReminderState[] = ["today", "overdue", "unset"];
+const reminderStateValues: FollowUpReminderState[] = ["today", "overdue", "completed", "unset"];
 
 function compactText(value: string) {
   return String(value || "")
@@ -138,6 +140,12 @@ function formatLocalDateTime(date = new Date()) {
   });
 
   return formatter.format(date).replace(/\//gu, "-");
+}
+
+function addDaysLocalDateTime(days: number) {
+  const nextDate = new Date();
+  nextDate.setDate(nextDate.getDate() + days);
+  return formatLocalDateTime(nextDate);
 }
 
 function getStrengthScore(value: string) {
@@ -233,9 +241,14 @@ function renderEventTags(event: FollowUpEvent, t: ReturnType<typeof useTranslati
       : "",
     event.contactResult ? t(`follow_ups.contact_results.${event.contactResult}`) : "",
     event.dealStage ? t(`follow_ups.deal_stages.${event.dealStage}`) : "",
+    event.reminderStatus === "completed" ? t("follow_ups.values.reminder_completed") : "",
   ].filter(Boolean);
 
-  return tags.map((tag) => <Tag key={`${event.id}-${tag}`}>{tag}</Tag>);
+  return tags.map((tag) => (
+    <Tag key={`${event.id}-${tag}`} color={tag === t("follow_ups.values.reminder_completed") ? "green" : undefined}>
+      {tag}
+    </Tag>
+  ));
 }
 
 async function saveFollowUpRecord(entry: FollowUpBoardEntry, values: FollowUpFormValues) {
@@ -254,6 +267,8 @@ async function saveFollowUpRecord(entry: FollowUpBoardEntry, values: FollowUpFor
       nextAction: values.nextAction,
       dealStage: values.dealStage,
       nextReminderAt: values.nextReminderAt,
+      reminderStatus: values.reminderStatus,
+      completedAt: values.completedAt,
       note: values.note,
       lastFollowedAt: values.lastFollowedAt,
     }),
@@ -301,6 +316,8 @@ function FollowUpCompanyCard({
       nextAction: record?.nextAction ?? "",
       dealStage: record?.dealStage ?? "",
       nextReminderAt: record?.nextReminderAt ?? "",
+      reminderStatus: record?.reminderStatus ?? "open",
+      completedAt: record?.completedAt ?? "",
       note: record?.note ?? "",
       lastFollowedAt: record?.lastFollowedAt ?? "",
     });
@@ -327,6 +344,61 @@ function FollowUpCompanyCard({
     form.setFieldValue("lastFollowedAt", formatLocalDateTime());
   }
 
+  function getQuickValues(nextValues: Partial<FollowUpFormValues>): FollowUpFormValues {
+    return {
+      stage: record?.stage ?? entry.stage,
+      owner: record?.owner ?? "",
+      communicationMethod: record?.communicationMethod ?? "",
+      contactResult: record?.contactResult ?? "",
+      nextAction: record?.nextAction ?? "",
+      dealStage: record?.dealStage ?? "",
+      nextReminderAt: record?.nextReminderAt ?? "",
+      reminderStatus: record?.reminderStatus ?? "open",
+      completedAt: record?.completedAt ?? "",
+      note: record?.note ?? "",
+      lastFollowedAt: record?.lastFollowedAt ?? "",
+      ...nextValues,
+    };
+  }
+
+  async function handleQuickSave(nextValues: Partial<FollowUpFormValues>, successMessage: string) {
+    setIsSaving(true);
+    try {
+      const nextRecord = await saveFollowUpRecord(entry, getQuickValues(nextValues));
+      onSaveRecord(nextRecord);
+      messageApi.success(successMessage);
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : t("follow_ups.messages.save_failed")
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function markCompleted() {
+    const now = formatLocalDateTime();
+    void handleQuickSave(
+      {
+        reminderStatus: "completed",
+        completedAt: now,
+        lastFollowedAt: now,
+      },
+      t("follow_ups.messages.completed")
+    );
+  }
+
+  function delayReminder(days: number) {
+    void handleQuickSave(
+      {
+        reminderStatus: "open",
+        completedAt: "",
+        nextReminderAt: addDaysLocalDateTime(days),
+      },
+      t("follow_ups.messages.delayed")
+    );
+  }
+
   return (
     <div className="rounded-[1.4rem] border border-(--color-line) bg-white/68 p-4 shadow-[0_14px_34px_rgba(69,49,28,0.08)]">
       {contextHolder}
@@ -349,6 +421,18 @@ function FollowUpCompanyCard({
         </div>
 
         <Space wrap size={[8, 8]}>
+          <Button loading={isSaving} onClick={markCompleted}>
+            {t("follow_ups.actions.complete")}
+          </Button>
+          <Button loading={isSaving} onClick={() => delayReminder(1)}>
+            {t("follow_ups.actions.delay_one_day")}
+          </Button>
+          <Button loading={isSaving} onClick={() => delayReminder(3)}>
+            {t("follow_ups.actions.delay_three_days")}
+          </Button>
+          <Button loading={isSaving} onClick={() => delayReminder(7)}>
+            {t("follow_ups.actions.delay_seven_days")}
+          </Button>
           <Button type="primary" onClick={openEditor}>
             {t("follow_ups.actions.edit")}
           </Button>
@@ -466,6 +550,21 @@ function FollowUpCompanyCard({
           <Typography.Text strong className="block">
             {formatDisplayUpdatedAt(record?.lastFollowedAt ?? "") ||
               t("follow_ups.values.not_followed")}
+          </Typography.Text>
+        </div>
+        <div className="rounded-[1rem] bg-(--color-card-soft) p-3">
+          <Typography.Text type="secondary">{t("follow_ups.fields.reminder_status")}</Typography.Text>
+          <Typography.Text strong className="block">
+            {record?.reminderStatus === "completed"
+              ? t("follow_ups.values.reminder_completed")
+              : t("follow_ups.values.reminder_open")}
+          </Typography.Text>
+        </div>
+        <div className="rounded-[1rem] bg-(--color-card-soft) p-3">
+          <Typography.Text type="secondary">{t("follow_ups.fields.completed_at")}</Typography.Text>
+          <Typography.Text strong className="block">
+            {formatDisplayUpdatedAt(record?.completedAt ?? "") ||
+              t("follow_ups.values.not_completed")}
           </Typography.Text>
         </div>
         <div className="rounded-[1rem] bg-(--color-card-soft) p-3">
@@ -587,6 +686,19 @@ function FollowUpCompanyCard({
           <Form.Item name="nextReminderAt" label={t("follow_ups.editor.next_reminder")}>
             <Input placeholder={t("follow_ups.editor.time_placeholder")} />
           </Form.Item>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Form.Item name="reminderStatus" label={t("follow_ups.editor.reminder_status")}>
+              <Select
+                options={[
+                  { value: "open", label: t("follow_ups.values.reminder_open") },
+                  { value: "completed", label: t("follow_ups.values.reminder_completed") },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item name="completedAt" label={t("follow_ups.editor.completed_at")}>
+              <Input placeholder={t("follow_ups.editor.time_placeholder")} />
+            </Form.Item>
+          </div>
           <Form.Item name="nextAction" label={t("follow_ups.editor.next_action")}>
             <Input.TextArea rows={2} placeholder={t("follow_ups.editor.next_action_placeholder")} />
           </Form.Item>
@@ -786,10 +898,10 @@ export function FollowUpManagementPanel({
           detail={t("follow_ups.metrics.overdue_detail")}
         />
         <MetricCard
-          icon={<FireOutlined />}
-          label={t("follow_ups.metrics.interested")}
-          value={reminderStats.interested}
-          detail={t("follow_ups.metrics.interested_detail")}
+          icon={<CheckCircleOutlined />}
+          label={t("follow_ups.metrics.completed")}
+          value={reminderStats.completed}
+          detail={t("follow_ups.metrics.completed_detail")}
         />
         <MetricCard
           icon={<SafetyCertificateOutlined />}

@@ -311,11 +311,13 @@
     "metrics": {
       "today": "今日待跟进",
       "today_detail": "下次提醒时间落在今天的企业。",
-      "overdue": "逾期未跟进",
-      "overdue_detail": "提醒时间早于今天，仍未更新跟进的企业。",
-      "interested": "有兴趣",
-      "interested_detail": "联系结果已标记为有兴趣的企业。",
-      "priority": "优先跟进",
+        "overdue": "逾期未跟进",
+        "overdue_detail": "提醒时间早于今天，仍未更新跟进的企业。",
+        "interested": "有兴趣",
+        "interested_detail": "联系结果已标记为有兴趣的企业。",
+        "completed": "已完成",
+        "completed_detail": "已标记完成，暂不进入提醒池的企业。",
+        "priority": "优先跟进",
       "priority_detail": "强度高、信号多或岗位需求明显的企业。",
       "watch": "持续观察",
       "watch_detail": "已有一定迹象，但还需要补充证据的企业。",
@@ -333,10 +335,11 @@
       "result": "当前显示 {{count}} / {{total}} 家企业。",
       "empty": "当前筛选条件下没有匹配企业。",
       "reminder_states": {
-        "today": "今日待跟进",
-        "overdue": "逾期未跟进",
-        "unset": "未设置提醒"
-      }
+          "today": "今日待跟进",
+          "overdue": "逾期未跟进",
+          "completed": "已完成",
+          "unset": "未设置提醒"
+        }
     },
     "stage_sections": {
       "priority_title": "优先跟进",
@@ -360,10 +363,12 @@
       "owner": "负责人",
       "communication_method": "沟通方式",
       "contact_result": "联系结果",
-      "deal_stage": "销售阶段",
-      "next_reminder": "下次提醒",
-      "last_followed": "最后跟进",
-      "manual_note": "跟进备注"
+        "deal_stage": "销售阶段",
+        "next_reminder": "下次提醒",
+        "reminder_status": "提醒状态",
+        "completed_at": "完成时间",
+        "last_followed": "最后跟进",
+        "manual_note": "跟进备注"
     },
     "values": {
       "signal_count": "{{count}} 条",
@@ -372,16 +377,23 @@
       "unassigned_owner": "未分配",
       "no_communication_method": "未选择",
       "no_contact_result": "未记录",
-      "no_deal_stage": "未设置",
-      "no_next_action": "暂无人工下一步",
-      "no_reminder": "未设置",
-      "not_followed": "未跟进",
-      "no_note": "暂无备注"
-    },
-    "actions": {
-      "open_profile": "查看企业档案",
-      "edit": "编辑跟进"
-    },
+        "no_deal_stage": "未设置",
+        "no_next_action": "暂无人工下一步",
+        "no_reminder": "未设置",
+        "reminder_open": "进行中",
+        "reminder_completed": "已完成",
+        "not_completed": "未完成",
+        "not_followed": "未跟进",
+        "no_note": "暂无备注"
+      },
+      "actions": {
+        "open_profile": "查看企业档案",
+        "edit": "编辑跟进",
+        "complete": "标记完成",
+        "delay_one_day": "延期 1 天",
+        "delay_three_days": "延期 3 天",
+        "delay_seven_days": "延期 7 天"
+      },
     "editor": {
       "title": "编辑跟进：{{company}}",
       "save": "保存",
@@ -395,9 +407,11 @@
       "contact_result": "联系结果",
       "contact_result_placeholder": "选择联系结果",
       "deal_stage": "销售阶段",
-      "deal_stage_placeholder": "选择销售阶段",
-      "next_reminder": "下次提醒时间",
-      "next_action": "人工下一步动作",
+        "deal_stage_placeholder": "选择销售阶段",
+        "next_reminder": "下次提醒时间",
+        "reminder_status": "提醒状态",
+        "completed_at": "完成时间",
+        "next_action": "人工下一步动作",
       "next_action_placeholder": "例如 明天电话确认 MES 项目负责人和当前系统情况",
       "last_followed": "最后跟进时间",
       "time_placeholder": "例如 2026-04-22 09:30:00",
@@ -405,10 +419,12 @@
       "note": "跟进备注",
       "note_placeholder": "记录电话、微信、拜访、判断依据或下一步动作"
     },
-    "messages": {
-      "saved": "跟进记录已保存",
-      "save_failed": "跟进记录保存失败"
-    },
+      "messages": {
+        "saved": "跟进记录已保存",
+        "save_failed": "跟进记录保存失败",
+        "completed": "已标记完成",
+        "delayed": "提醒时间已延期"
+      },
     "communication_methods": {
       "phone": "电话",
       "wechat": "微信",

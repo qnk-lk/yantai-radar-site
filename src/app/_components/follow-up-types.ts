@@ -20,6 +20,8 @@ export type FollowUpDealStage =
   | "lost"
   | "";
 
+export type FollowUpReminderStatus = "open" | "completed";
+
 export type FollowUpRecord = {
   companyId: string;
   companyName: string;
@@ -31,6 +33,8 @@ export type FollowUpRecord = {
   nextAction: string;
   dealStage: FollowUpDealStage;
   nextReminderAt: string;
+  reminderStatus: FollowUpReminderStatus;
+  completedAt: string;
   note: string;
   lastFollowedAt: string;
   createdAt: string;
@@ -50,6 +54,8 @@ export type FollowUpEvent = {
   nextAction: string;
   dealStage: FollowUpDealStage;
   nextReminderAt: string;
+  reminderStatus: FollowUpReminderStatus;
+  completedAt: string;
   note: string;
   followedAt: string;
   createdAt: string;

@@ -31,6 +31,7 @@ upsertFollowUpRecord(db, {
   nextAction: "确认 MES 系统负责人",
   dealStage: "contacted",
   nextReminderAt: "2026-04-25 09:00:00",
+  reminderStatus: "open",
   note: "第一次电话沟通",
   lastFollowedAt: "2026-04-24 09:30:00",
 });
@@ -46,6 +47,8 @@ upsertFollowUpRecord(db, {
   nextAction: "发送方案资料",
   dealStage: "qualified",
   nextReminderAt: "2026-04-26 10:00:00",
+  reminderStatus: "completed",
+  completedAt: "2026-04-24 15:10:00",
   note: "客户表达初步兴趣",
   lastFollowedAt: "2026-04-24 15:00:00",
 });
@@ -56,10 +59,13 @@ const events = readFollowUpEvents(db, companyId);
 assert.equal(latest.stage, "priority");
 assert.equal(latest.communicationMethod, "wechat");
 assert.equal(latest.contactResult, "interested");
+assert.equal(latest.reminderStatus, "completed");
+assert.equal(latest.completedAt, "2026-04-24 15:10:00");
 assert.equal(events.length, 2);
 assert.equal(events[0].note, "客户表达初步兴趣");
 assert.equal(events[1].note, "第一次电话沟通");
 assert.equal(events[0].followedAt, "2026-04-24 15:00:00");
+assert.equal(events[0].reminderStatus, "completed");
 
 db.close();
 await fs.rm(dbPath, { force: true });

@@ -12,6 +12,7 @@ const entries = [
     stage: "priority",
     followUpRecord: {
       owner: "LK",
+      reminderStatus: "open",
       nextReminderAt: "2026-04-24 09:30:00",
       contactResult: "interested",
     },
@@ -20,6 +21,7 @@ const entries = [
     stage: "watch",
     followUpRecord: {
       owner: "Ming",
+      reminderStatus: "open",
       nextReminderAt: "2026-04-23 09:30:00",
       contactResult: "pending",
     },
@@ -28,8 +30,18 @@ const entries = [
     stage: "screening",
     followUpRecord: {
       owner: "",
+      reminderStatus: "open",
       nextReminderAt: "",
       contactResult: "",
+    },
+  },
+  {
+    stage: "priority",
+    followUpRecord: {
+      owner: "LK",
+      reminderStatus: "completed",
+      nextReminderAt: "2026-04-23 09:30:00",
+      contactResult: "connected",
     },
   },
 ];
@@ -43,6 +55,7 @@ assert.deepEqual(getFollowUpFilterStats(entries, now), {
   overdue: 1,
   unassigned: 1,
   interested: 1,
+  completed: 1,
 });
 
 assert.deepEqual(getFollowUpOwners(entries), ["LK", "Ming"]);
@@ -52,6 +65,20 @@ assert.equal(
     entries,
     {
       reminderState: "today",
+      owner: "",
+      stage: "all",
+      contactResult: "all",
+    },
+    now
+  ).length,
+  1
+);
+
+assert.equal(
+  filterFollowUpEntries(
+    entries,
+    {
+      reminderState: "completed",
       owner: "",
       stage: "all",
       contactResult: "all",
