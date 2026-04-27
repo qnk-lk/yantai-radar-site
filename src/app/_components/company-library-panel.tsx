@@ -10,7 +10,7 @@ import {
   ScheduleOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Card, Empty, Input, Space, Statistic, Tag, Typography } from "antd";
+import { Card, Empty, Input, Select, Space, Statistic, Tag, Typography } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +18,26 @@ import type { FollowUpRecord, FollowUpStage } from "./follow-up-types";
 import type { SalesIntelItem } from "./sales-intel-types";
 
 type CompanyJob = NonNullable<SalesIntelItem["allJobs"]>[number];
+type CompanyStageFilter = FollowUpStage | "all";
+
+export type CompanyProfileRecord = {
+  companyId: string;
+  companyName: string;
+  city: string;
+  industry: string;
+  scale: string;
+  website: string;
+  address: string;
+  contactName: string;
+  contactMethod: string;
+  owner: string;
+  level: string;
+  status: string;
+  tags: string[];
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type CompanyLibraryEntry = {
   id: string;
@@ -197,6 +217,7 @@ const DEMAND_KEYWORDS = [
   "质量管理",
   "仓储",
 ] as const;
+const companyStageFilterValues: FollowUpStage[] = ["priority", "watch", "screening"];
 
 function collectCompanyDemandTags(entry: CompanyLibraryEntry, jobs: CompanyJob[]) {
   const signalText = [
@@ -663,9 +684,11 @@ function JobPreviewList({ jobs }: { jobs: CompanyJob[] }) {
 function CompanyProfile({
   entry,
   followUpRecord,
+  profileRecord,
 }: {
   entry: CompanyLibraryEntry | null;
   followUpRecord?: FollowUpRecord | null;
+  profileRecord?: CompanyProfileRecord | null;
 }) {
   const { t } = useTranslation();
 
@@ -799,6 +822,58 @@ function CompanyProfile({
             </div>
           </Card>
 
+          <Card size="small" title={t("companies.profile.master_title")}>
+            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              <CompanyProfileField
+                label={t("companies.profile.fields.industry")}
+                value={profileRecord?.industry || t("companies.profile.master_empty")}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.scale")}
+                value={profileRecord?.scale || t("companies.profile.master_empty")}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.level")}
+                value={profileRecord?.level || t("companies.profile.master_empty")}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.status")}
+                value={profileRecord?.status || t("companies.profile.master_empty")}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.website")}
+                value={profileRecord?.website || t("companies.profile.master_empty")}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.address")}
+                value={profileRecord?.address || t("companies.profile.master_empty")}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.contact")}
+                value={profileRecord?.contactName || t("companies.profile.master_empty")}
+              />
+              <CompanyProfileField
+                label={t("companies.profile.fields.contact_method")}
+                value={profileRecord?.contactMethod || t("companies.profile.master_empty")}
+              />
+            </div>
+            <div className="mt-3 rounded-[1rem] border border-dashed border-(--color-line) bg-white/55 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Typography.Text type="secondary">
+                  {t("companies.profile.master_tags")}
+                </Typography.Text>
+                {profileRecord?.tags?.length ? (
+                  profileRecord.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)
+                ) : (
+                  <Tag>{t("companies.profile.master_empty")}</Tag>
+                )}
+              </div>
+              <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                {profileRecord?.note || t("companies.profile.master_note_empty")}
+              </Typography.Paragraph>
+            </div>
+          </Card>
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(20rem,0.92fr)]">
             <Card size="small" title={t("companies.profile.summary_title")}>
               <Typography.Paragraph style={{ marginBottom: 0 }}>
@@ -871,12 +946,17 @@ function CompanyProfile({
 export function CompanyLibraryPanel({
   entries,
   records,
+  profiles,
 }: {
   entries: CompanyLibraryEntry[];
   records: FollowUpRecord[];
+  profiles: CompanyProfileRecord[];
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
+  const [stageFilter, setStageFilter] = useState<CompanyStageFilter>("all");
+  const [demandFilter, setDemandFilter] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(entries[0]?.id ?? null);
   const totalSignalCount = useMemo(() => getEntryTotalSignalCount(entries), [entries]);
   const totalJobCount = useMemo(() => getEntryTotalJobCount(entries), [entries]);
@@ -884,6 +964,33 @@ export function CompanyLibraryPanel({
     () => new Map(records.map((record) => [record.companyId, record])),
     [records]
   );
+  const profileMap = useMemo(
+    () => new Map(profiles.map((profile) => [profile.companyId, profile])),
+    [profiles]
+  );
+  const cityOptions = useMemo(
+    () =>
+      uniqueStrings(entries.map((entry) => entry.city)).map((city) => ({
+        value: city,
+        label: city,
+      })),
+    [entries]
+  );
+  const demandOptions = useMemo(() => {
+    const demandSet = new Set<string>();
+
+    for (const entry of entries) {
+      const jobs = collectCompanyJobs(entry);
+      for (const tag of collectCompanyDemandTags(entry, jobs)) {
+        demandSet.add(tag);
+      }
+    }
+
+    return [...demandSet].sort((left, right) => left.localeCompare(right)).map((tag) => ({
+      value: tag,
+      label: tag,
+    }));
+  }, [entries]);
 
   useEffect(() => {
     const targetId = new URLSearchParams(window.location.search).get("company");
@@ -901,17 +1008,35 @@ export function CompanyLibraryPanel({
   }, [entries]);
 
   const filteredEntries = useMemo(() => {
-    if (!query.trim()) {
-      return entries;
-    }
-
     const normalizedQuery = query.trim().toLowerCase();
-    return entries.filter((entry) =>
-      [
+
+    return entries.filter((entry) => {
+      const record = followUpRecordMap.get(entry.id);
+      const stage = record?.stage ?? resolveCompanyStage(entry);
+      const demandTags = collectCompanyDemandTags(entry, collectCompanyJobs(entry));
+
+      if (cityFilter && entry.city !== cityFilter) {
+        return false;
+      }
+
+      if (stageFilter !== "all" && stage !== stageFilter) {
+        return false;
+      }
+
+      if (demandFilter && !(demandTags as readonly string[]).includes(demandFilter)) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      return [
         entry.companyName,
         entry.city,
         entry.latestSummary,
         ...entry.sourcePlatforms,
+        ...demandTags,
         ...entry.items.flatMap((item) => [
           item.title,
           item.summary,
@@ -921,9 +1046,9 @@ export function CompanyLibraryPanel({
       ]
         .join(" ")
         .toLowerCase()
-        .includes(normalizedQuery)
-    );
-  }, [entries, query]);
+        .includes(normalizedQuery);
+    });
+  }, [cityFilter, demandFilter, entries, followUpRecordMap, query, stageFilter]);
 
   const resolvedSelectedId =
     selectedId && filteredEntries.some((entry) => entry.id === selectedId)
@@ -931,6 +1056,7 @@ export function CompanyLibraryPanel({
       : (filteredEntries[0]?.id ?? null);
   const activeEntry = filteredEntries.find((entry) => entry.id === resolvedSelectedId) ?? null;
   const activeFollowUpRecord = activeEntry ? followUpRecordMap.get(activeEntry.id) : null;
+  const activeProfileRecord = activeEntry ? profileMap.get(activeEntry.id) : null;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(19rem,0.76fr)_minmax(0,1.24fr)]">
@@ -951,6 +1077,40 @@ export function CompanyLibraryPanel({
           <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
             {t("companies.index_description")}
           </Typography.Paragraph>
+
+          <div className="grid gap-3">
+            <Select
+              allowClear
+              value={cityFilter || undefined}
+              onChange={(value) => setCityFilter(value ?? "")}
+              placeholder={t("companies.filters.city")}
+              options={cityOptions}
+            />
+            <Select
+              value={stageFilter}
+              onChange={(value) => setStageFilter(value)}
+              options={[
+                { value: "all", label: t("companies.filters.all_stages") },
+                ...companyStageFilterValues.map((stage) => ({
+                  value: stage,
+                  label: getFollowUpStageLabel(t, stage),
+                })),
+              ]}
+            />
+            <Select
+              allowClear
+              value={demandFilter || undefined}
+              onChange={(value) => setDemandFilter(value ?? "")}
+              placeholder={t("companies.filters.demand")}
+              options={demandOptions}
+            />
+            <Typography.Text type="secondary">
+              {t("companies.filters.result", {
+                count: filteredEntries.length,
+                total: entries.length,
+              })}
+            </Typography.Text>
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
             <CompanyMetricCard
@@ -987,7 +1147,11 @@ export function CompanyLibraryPanel({
         </Space>
       </Card>
 
-      <CompanyProfile entry={activeEntry} followUpRecord={activeFollowUpRecord} />
+      <CompanyProfile
+        entry={activeEntry}
+        followUpRecord={activeFollowUpRecord}
+        profileRecord={activeProfileRecord}
+      />
     </div>
   );
 }

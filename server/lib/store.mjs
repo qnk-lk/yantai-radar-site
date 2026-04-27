@@ -320,6 +320,54 @@ function normalizeFollowUpInput(input) {
   };
 }
 
+function normalizeCompanyProfile(row) {
+  return {
+    companyId: row.company_id,
+    companyName: row.company_name,
+    city: row.city,
+    industry: row.industry,
+    scale: row.scale,
+    website: row.website,
+    address: row.address,
+    contactName: row.contact_name,
+    contactMethod: row.contact_method,
+    owner: row.owner,
+    level: row.level,
+    status: row.status,
+    tags: parseJsonText(row.tags, []),
+    note: row.note,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeCompanyProfileInput(input) {
+  const now = new Date().toISOString();
+  const companyId = normalizeText(input?.companyId);
+
+  if (!companyId) {
+    throw new Error("companyId is required");
+  }
+
+  return {
+    companyId,
+    companyName: normalizeText(input?.companyName),
+    city: normalizeText(input?.city),
+    industry: normalizeText(input?.industry),
+    scale: normalizeText(input?.scale),
+    website: normalizeText(input?.website),
+    address: normalizeText(input?.address),
+    contactName: normalizeText(input?.contactName),
+    contactMethod: normalizeText(input?.contactMethod),
+    owner: normalizeText(input?.owner),
+    level: normalizeText(input?.level),
+    status: normalizeText(input?.status),
+    tags: normalizeStringList(input?.tags),
+    note: normalizeText(input?.note),
+    updatedAt: normalizeText(input?.updatedAt, now),
+  };
+}
+
 function ensureTableColumn(db, tableName, columnName, columnDefinition) {
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
 
@@ -924,6 +972,25 @@ export function ensureSchema(db) {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS company_profiles (
+      company_id TEXT PRIMARY KEY,
+      company_name TEXT NOT NULL,
+      city TEXT NOT NULL DEFAULT '',
+      industry TEXT NOT NULL DEFAULT '',
+      scale TEXT NOT NULL DEFAULT '',
+      website TEXT NOT NULL DEFAULT '',
+      address TEXT NOT NULL DEFAULT '',
+      contact_name TEXT NOT NULL DEFAULT '',
+      contact_method TEXT NOT NULL DEFAULT '',
+      owner TEXT NOT NULL DEFAULT '',
+      level TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT '',
+      tags TEXT NOT NULL DEFAULT '[]',
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_competitor_master_active
       ON competitor_master (is_active, city, latest_rank);
 
@@ -941,12 +1008,138 @@ export function ensureSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_follow_up_events_company
       ON follow_up_events (company_id, created_at DESC, id DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_company_profiles_city
+      ON company_profiles (city, updated_at DESC);
   `);
 
   for (const [columnName, columnDefinition] of FOLLOW_UP_EXTRA_COLUMNS) {
     ensureTableColumn(db, "follow_up_records", columnName, columnDefinition);
     ensureTableColumn(db, "follow_up_events", columnName, columnDefinition);
   }
+}
+
+export function readCompanyProfiles(db) {
+  return db
+    .prepare(
+      `
+        SELECT
+          company_id,
+          company_name,
+          city,
+          industry,
+          scale,
+          website,
+          address,
+          contact_name,
+          contact_method,
+          owner,
+          level,
+          status,
+          tags,
+          note,
+          created_at,
+          updated_at
+        FROM company_profiles
+        ORDER BY updated_at DESC, company_name ASC
+      `
+    )
+    .all()
+    .map(normalizeCompanyProfile);
+}
+
+export function readCompanyProfile(db, companyId) {
+  const row = db
+    .prepare(
+      `
+        SELECT
+          company_id,
+          company_name,
+          city,
+          industry,
+          scale,
+          website,
+          address,
+          contact_name,
+          contact_method,
+          owner,
+          level,
+          status,
+          tags,
+          note,
+          created_at,
+          updated_at
+        FROM company_profiles
+        WHERE company_id = ?
+      `
+    )
+    .get(normalizeText(companyId));
+
+  return row ? normalizeCompanyProfile(row) : null;
+}
+
+export function upsertCompanyProfile(db, input) {
+  const profile = normalizeCompanyProfileInput(input);
+  const now = new Date().toISOString();
+  const createdAt = now;
+
+  db.prepare(
+    `
+      INSERT INTO company_profiles (
+        company_id,
+        company_name,
+        city,
+        industry,
+        scale,
+        website,
+        address,
+        contact_name,
+        contact_method,
+        owner,
+        level,
+        status,
+        tags,
+        note,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(company_id) DO UPDATE SET
+        company_name = excluded.company_name,
+        city = excluded.city,
+        industry = excluded.industry,
+        scale = excluded.scale,
+        website = excluded.website,
+        address = excluded.address,
+        contact_name = excluded.contact_name,
+        contact_method = excluded.contact_method,
+        owner = excluded.owner,
+        level = excluded.level,
+        status = excluded.status,
+        tags = excluded.tags,
+        note = excluded.note,
+        updated_at = excluded.updated_at
+    `
+  ).run(
+    profile.companyId,
+    profile.companyName,
+    profile.city,
+    profile.industry,
+    profile.scale,
+    profile.website,
+    profile.address,
+    profile.contactName,
+    profile.contactMethod,
+    profile.owner,
+    profile.level,
+    profile.status,
+    JSON.stringify(profile.tags),
+    profile.note,
+    createdAt,
+    profile.updatedAt
+  );
+
+  return readCompanyProfile(db, profile.companyId);
 }
 
 export function hasDocument(db, key) {

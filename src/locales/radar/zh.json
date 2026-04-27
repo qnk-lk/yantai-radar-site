@@ -221,15 +221,25 @@
     "platform_metric": "来源平台",
     "job_metric": "关联岗位",
     "total_companies_metric": "企业数量",
-    "total_signals_metric": "累计信号",
-    "total_jobs_metric": "岗位线索",
-    "recent_signals": "最近命中的信号",
-    "empty": "当前还没有可聚合到企业库的数据。",
-    "unknown_city": "未知地区",
-    "profile": {
+      "total_signals_metric": "累计信号",
+      "total_jobs_metric": "岗位线索",
+      "recent_signals": "最近命中的信号",
+      "empty": "当前还没有可聚合到企业库的数据。",
+      "unknown_city": "未知地区",
+      "filters": {
+        "city": "按城市筛选",
+        "demand": "按需求关键词筛选",
+        "all_stages": "全部跟进阶段",
+        "result": "当前显示 {{count}} / {{total}} 家企业。"
+      },
+      "profile": {
       "subtitle": "基于当前已沉淀的销售线索自动形成的企业档案首版，后续可继续接跟进状态和主档案。",
-      "basic_title": "企业基础画像",
-      "summary_title": "企业判断摘要",
+        "basic_title": "企业基础画像",
+        "master_title": "企业主档案",
+        "master_empty": "待补充",
+        "master_tags": "档案标签",
+        "master_note_empty": "当前还没有企业主档案备注。",
+        "summary_title": "企业判断摘要",
       "summary_empty": "当前还没有足够摘要信息。",
       "demand_title": "需求判断",
       "demand_description": "当前信号集中在 {{value}} 等方向，可作为优先沟通切入点。",
@@ -263,11 +273,19 @@
       "risk_normal_detail": "该企业已有多条信号、多个证据来源或明确岗位需求，可以进入下一步判断。",
       "no_strength": "暂无强度",
       "fields": {
-        "company": "公司名称",
-        "city": "所在城市",
-        "first_seen": "首次命中",
-        "latest_seen": "最近命中"
-      },
+          "company": "公司名称",
+          "city": "所在城市",
+          "first_seen": "首次命中",
+          "latest_seen": "最近命中",
+          "industry": "所属行业",
+          "scale": "企业规模",
+          "level": "客户等级",
+          "status": "客户状态",
+          "website": "官网",
+          "address": "地址",
+          "contact": "联系人",
+          "contact_method": "联系方式"
+        },
       "risks": {
         "single_signal_title": "只有一次命中",
         "single_signal_detail": "当前仍属于早期线索，需要后续重复命中或补充公开证据。",
@@ -297,13 +315,25 @@
     "empty_stage": "当前阶段没有企业。",
     "future_title": "后续闭环方向",
     "future_description": "下一阶段可以继续补沟通记录、触达结果、提醒规则和成交阶段，让情报线索真正进入销售动作闭环。",
-    "history": {
-      "title": "跟进时间线",
-      "count": "最近 {{count}} 条",
-      "empty": "暂无历史跟进记录，保存一次跟进后会自动沉淀到这里。",
-      "next_action": "下一步：{{value}}"
-    },
-    "stages": {
+      "history": {
+        "title": "跟进时间线",
+        "count": "最近 {{count}} 条",
+        "empty": "暂无历史跟进记录，保存一次跟进后会自动沉淀到这里。",
+        "next_action": "下一步：{{value}}"
+      },
+      "task_board": {
+        "title": "今日任务看板",
+        "subtitle": "先处理逾期和今日提醒，再复盘已完成。",
+        "today": "今日待办",
+        "today_detail": "下次提醒落在今天的企业。",
+        "overdue": "逾期任务",
+        "overdue_detail": "提醒时间已经早于今天的企业。",
+        "completed": "已完成",
+        "completed_detail": "近期已经标记完成的企业。",
+        "view_all": "查看全部",
+        "empty": "当前没有对应任务。"
+      },
+      "stages": {
       "priority": "优先跟进",
       "watch": "持续观察",
       "screening": "初筛池"
@@ -468,11 +498,11 @@
       "basic_signal": "基础线索"
     }
   },
-  "sources": {
-    "title": "数据源状态概览",
-    "description": "这里先看几条核心数据链路是否有更新，后面再继续补手动触发和错误日志。",
-    "cards": {
-      "report_title": "OpenClaw 日报",
+    "sources": {
+      "title": "数据源状态概览",
+      "description": "集中查看各条数据链路是否更新、写入多少数据、对应哪个接口和数据库快照。",
+      "cards": {
+        "report_title": "OpenClaw 日报",
       "report_detail": "已同步 {{count}} 条日报类信息",
       "recruitment_title": "招聘与平台聚合",
       "recruitment_detail": "已同步 {{count}} 条招聘类信息",
@@ -482,22 +512,63 @@
       "follow_up_detail": "当前已保存 {{count}} 条人工跟进记录",
       "search_title": "今日检索项",
       "search_detail": "当前随机命中的检索项：{{value}}",
-      "search_empty": "当前还没有记录到今日检索项。"
+        "search_empty": "当前还没有记录到今日检索项。"
+      },
+      "status": {
+        "normal": "正常",
+        "stale": "可能过期",
+        "missing": "未同步",
+        "count": "数量",
+        "updated_at": "更新时间：{{value}}",
+        "api_path": "接口：{{value}}",
+        "document_key": "快照：{{value}}"
+      },
+      "platforms": {
+        "title": "平台抓取状态",
+        "description": "当前还没有拿到平台覆盖结果，等待招聘与平台聚合任务写入。",
+        "updated_at": "更新时间：{{value}}",
+        "status_ok": "成功",
+        "status_failed": "失败",
+        "status_skipped": "跳过",
+        "status_waiting": "待同步",
+        "effective_count": "有效公司：{{count}} 家",
+        "no_query": "暂无检索摘要",
+        "no_note": "暂无说明"
+      },
+      "health": {
+        "title": "接口与数据库状态",
+        "summary_title": "链路健康度",
+        "source_health": "当前健康度",
+        "source_health_detail": "{{normal}} / {{total}} 条链路在最近时间窗口内有更新。",
+        "api_status": "API 状态",
+        "online": "在线",
+        "unknown": "未知",
+        "api_ok": "健康检查接口可访问。",
+        "api_unknown": "当前没有拿到健康检查结果。",
+        "server_time": "服务器时间",
+        "server_time_detail": "来自后端健康检查接口的当前时间。",
+        "document_count": "数据库文档",
+        "document_count_detail": "统计当前后端 documents 表中的业务数据快照。",
+        "document_count_value": "{{count}} 个快照",
+        "documents_title": "文档快照明细",
+        "follow_up_records": "跟进记录",
+        "follow_up_records_detail": "统计已保存的人工跟进记录数量。",
+        "storage_title": "存储位置",
+        "data_dir": "数据目录：{{value}}",
+        "db_path": "数据库：{{value}}",
+        "empty_documents": "当前没有拿到数据库文档状态。"
+      },
+      "tables": {
+        "documents": "文档快照",
+        "follow_up_records": "跟进主表",
+        "follow_up_events": "跟进历史",
+        "company_profiles": "企业主档案",
+        "competitor_master": "同行主表",
+        "competitor_snapshots": "同行快照",
+        "competitor_updates": "同行变更",
+        "counter_detail": "后端数据库当前行数。"
+      }
     },
-    "health": {
-      "title": "接口与数据库状态",
-      "api_status": "API 状态",
-      "online": "在线",
-      "unknown": "未知",
-      "api_ok": "健康检查接口可访问。",
-      "api_unknown": "当前没有拿到健康检查结果。",
-      "document_count": "数据库文档",
-      "document_count_detail": "统计当前后端 documents 表中的业务数据快照。",
-      "follow_up_records": "跟进记录",
-      "follow_up_records_detail": "统计已保存的人工跟进记录数量。",
-      "empty_documents": "当前没有拿到数据库文档状态。"
-    }
-  },
   "sections": {
     "priority_eyebrow": "高优线索",
     "priority_title": "今日高优先级销售线索",

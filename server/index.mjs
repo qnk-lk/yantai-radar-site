@@ -3,11 +3,14 @@ import Fastify from "fastify";
 
 import {
   initializeStore,
+  readCompanyProfile,
+  readCompanyProfiles,
   readCompetitorUpdates,
   readDocument,
   readFollowUpRecord,
   readFollowUpRecords,
   resolveConfig,
+  upsertCompanyProfile,
   upsertFollowUpRecord,
 } from "./lib/store.mjs";
 
@@ -332,6 +335,15 @@ function buildApp(config, db) {
 
   app.get("/api/health", async () => {
     const rows = db.prepare("SELECT key, source, updated_at FROM documents ORDER BY key").all();
+    const tableCounts = {
+      documents: db.prepare("SELECT COUNT(*) AS count FROM documents").get().count,
+      followUpRecords: db.prepare("SELECT COUNT(*) AS count FROM follow_up_records").get().count,
+      followUpEvents: db.prepare("SELECT COUNT(*) AS count FROM follow_up_events").get().count,
+      companyProfiles: db.prepare("SELECT COUNT(*) AS count FROM company_profiles").get().count,
+      competitorMaster: db.prepare("SELECT COUNT(*) AS count FROM competitor_master").get().count,
+      competitorSnapshots: db.prepare("SELECT COUNT(*) AS count FROM competitor_snapshots").get().count,
+      competitorUpdates: db.prepare("SELECT COUNT(*) AS count FROM competitor_updates").get().count,
+    };
 
     return {
       ok: true,
@@ -339,6 +351,7 @@ function buildApp(config, db) {
       dbPath: config.dbPath,
       timestamp: new Date().toISOString(),
       documents: rows,
+      tableCounts,
     };
   });
 
@@ -475,6 +488,51 @@ function buildApp(config, db) {
       return {
         ok: false,
         message: error instanceof Error ? error.message : "Invalid follow-up record",
+      };
+    }
+  });
+
+  app.get("/api/company-profiles", async () => {
+    const items = readCompanyProfiles(db);
+
+    return {
+      items,
+      totals: {
+        overall: items.length,
+      },
+    };
+  });
+
+  app.get("/api/company-profiles/:companyId", async (request, reply) => {
+    const item = readCompanyProfile(db, request.params?.companyId);
+
+    if (!item) {
+      reply.code(404);
+      return {
+        ok: false,
+        message: "Company profile not found",
+      };
+    }
+
+    return item;
+  });
+
+  app.put("/api/company-profiles/:companyId", async (request, reply) => {
+    try {
+      const item = upsertCompanyProfile(db, {
+        ...(request.body ?? {}),
+        companyId: request.params?.companyId,
+      });
+
+      return {
+        ok: true,
+        item,
+      };
+    } catch (error) {
+      reply.code(400);
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Invalid company profile",
       };
     }
   });

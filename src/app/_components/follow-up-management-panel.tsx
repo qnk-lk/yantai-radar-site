@@ -31,6 +31,7 @@ import {
   filterFollowUpEntries,
   getFollowUpFilterStats,
   getFollowUpOwners,
+  getReminderState,
   type FollowUpFilterState,
   type FollowUpReminderState,
 } from "./follow-up-filtering";
@@ -229,6 +230,113 @@ function MetricCard({
       <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
         {detail}
       </Typography.Paragraph>
+    </Card>
+  );
+}
+
+function FollowUpTaskBoard({
+  entries,
+  onSelectState,
+}: {
+  entries: FollowUpBoardEntry[];
+  onSelectState: (state: FollowUpReminderState) => void;
+}) {
+  const { t } = useTranslation();
+  const groups: Array<{
+    state: FollowUpReminderState;
+    title: string;
+    detail: string;
+    color: string;
+  }> = [
+    {
+      state: "today",
+      title: t("follow_ups.task_board.today"),
+      detail: t("follow_ups.task_board.today_detail"),
+      color: "blue",
+    },
+    {
+      state: "overdue",
+      title: t("follow_ups.task_board.overdue"),
+      detail: t("follow_ups.task_board.overdue_detail"),
+      color: "red",
+    },
+    {
+      state: "completed",
+      title: t("follow_ups.task_board.completed"),
+      detail: t("follow_ups.task_board.completed_detail"),
+      color: "green",
+    },
+  ];
+
+  return (
+    <Card
+      title={t("follow_ups.task_board.title")}
+      extra={<Typography.Text type="secondary">{t("follow_ups.task_board.subtitle")}</Typography.Text>}
+    >
+      <div className="grid gap-4 xl:grid-cols-3">
+        {groups.map((group) => {
+          const groupEntries = entries
+            .filter((entry) => getReminderState(entry.followUpRecord) === group.state)
+            .slice(0, 5);
+
+          return (
+            <div
+              key={group.state}
+              className="rounded-[1.25rem] border border-(--color-line) bg-(--color-card-soft) p-4"
+            >
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Tag color={group.color}>{groupEntries.length}</Tag>
+                    <Typography.Text strong>{group.title}</Typography.Text>
+                  </div>
+                  <Typography.Paragraph type="secondary" style={{ marginTop: 6, marginBottom: 0 }}>
+                    {group.detail}
+                  </Typography.Paragraph>
+                </div>
+                <Button size="small" onClick={() => onSelectState(group.state)}>
+                  {t("follow_ups.task_board.view_all")}
+                </Button>
+              </div>
+
+              {groupEntries.length ? (
+                <div className="grid gap-3">
+                  {groupEntries.map((entry) => {
+                    const record = entry.followUpRecord;
+                    const reminderTime =
+                      group.state === "completed"
+                        ? formatDisplayUpdatedAt(record?.completedAt ?? "")
+                        : formatDisplayUpdatedAt(record?.nextReminderAt ?? "");
+
+                    return (
+                      <div
+                        key={`${group.state}-${entry.id}`}
+                        className="rounded-[1rem] border border-(--color-line) bg-white/70 px-3 py-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Typography.Text strong>{entry.companyName}</Typography.Text>
+                          <Tag>{record?.owner || t("follow_ups.values.unassigned_owner")}</Tag>
+                        </div>
+                        <Typography.Paragraph
+                          ellipsis={{ rows: 2 }}
+                          style={{ marginTop: 8, marginBottom: 0 }}
+                        >
+                          {record?.nextAction || entry.suggestedAction}
+                        </Typography.Paragraph>
+                        <Typography.Text type="secondary" className="mt-2 block">
+                          {reminderTime || t("follow_ups.values.no_reminder")}
+                        </Typography.Text>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Empty description={t("follow_ups.task_board.empty")} />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </Card>
   );
 }
@@ -910,6 +1018,11 @@ export function FollowUpManagementPanel({
           detail={t("follow_ups.metrics.unassigned_detail")}
         />
       </div>
+
+      <FollowUpTaskBoard
+        entries={boardEntries}
+        onSelectState={(state) => updateFilter({ reminderState: state })}
+      />
 
       <Card>
         <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
