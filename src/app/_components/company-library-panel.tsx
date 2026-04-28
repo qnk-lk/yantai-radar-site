@@ -10,15 +10,46 @@ import {
   ScheduleOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Card, Empty, Input, Select, Space, Statistic, Tag, Typography } from "antd";
+import {
+  Button,
+  Card,
+  Empty,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Statistic,
+  Tag,
+  Typography,
+} from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FollowUpRecord, FollowUpStage } from "./follow-up-types";
-import type { CompanyDuplicateGroup, SalesIntelItem } from "./sales-intel-types";
+import type {
+  CompanyDuplicateDecision,
+  CompanyDuplicateGroup,
+  SalesIntelItem,
+} from "./sales-intel-types";
 
 type CompanyJob = NonNullable<SalesIntelItem["allJobs"]>[number];
 type CompanyStageFilter = FollowUpStage | "all";
+type CompanyProfileFormValues = Pick<
+  CompanyProfileRecord,
+  | "industry"
+  | "scale"
+  | "website"
+  | "address"
+  | "contactName"
+  | "contactMethod"
+  | "owner"
+  | "level"
+  | "status"
+  | "note"
+> & {
+  tagsText: string;
+};
 
 export type CompanyProfileRecord = {
   companyId: string;
@@ -56,6 +87,14 @@ function compactText(value: string) {
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function parseProfileTags(value: string) {
+  return uniqueStrings(
+    String(value || "")
+      .split(/[,，、\n]/u)
+      .map((item) => item.trim())
+  );
 }
 
 function getSortKey(value: string) {
@@ -326,6 +365,80 @@ export function buildCompanyLibraryEntries(items: SalesIntelItem[]) {
   });
 }
 
+export function applyCompanyDuplicateDecisions(
+  entries: CompanyLibraryEntry[],
+  decisions: CompanyDuplicateDecision[]
+) {
+  const mergedDecisions = decisions.filter(
+    (decision) =>
+      decision.status === "merged" && decision.canonicalCompanyId && decision.companyIds.length > 1
+  );
+
+  if (!mergedDecisions.length) {
+    return entries;
+  }
+
+  const decisionByCompanyId = new Map<string, CompanyDuplicateDecision>();
+
+  for (const decision of mergedDecisions) {
+    for (const companyId of decision.companyIds) {
+      decisionByCompanyId.set(companyId, decision);
+    }
+  }
+
+  const mergedMap = new Map<string, CompanyLibraryEntry>();
+
+  for (const entry of entries) {
+    const decision = decisionByCompanyId.get(entry.id);
+    const targetId = decision?.canonicalCompanyId || entry.id;
+    const current = mergedMap.get(targetId);
+
+    if (!current) {
+      mergedMap.set(targetId, {
+        ...entry,
+        id: targetId,
+        companyName: decision?.canonicalCompanyName || entry.companyName,
+        city: entry.city,
+        sourcePlatforms: uniqueStrings(entry.sourcePlatforms),
+        items: [...entry.items],
+      });
+      continue;
+    }
+
+    current.signalCount += entry.signalCount;
+    current.allJobsCount += entry.allJobsCount;
+    current.sourcePlatforms = uniqueStrings([...current.sourcePlatforms, ...entry.sourcePlatforms]);
+    current.items = [...current.items, ...entry.items].sort((left, right) =>
+      compareTimestampDesc(
+        compactText(left.retrievedAt || left.publishedAt || ""),
+        compactText(right.retrievedAt || right.publishedAt || "")
+      )
+    );
+
+    if (entry.city && !current.city.includes(entry.city)) {
+      current.city = uniqueStrings([current.city, entry.city]).join("、");
+    }
+
+    if (compareTimestampDesc(current.latestRetrievedAt, entry.latestRetrievedAt) > 0) {
+      current.latestRetrievedAt = entry.latestRetrievedAt;
+      current.latestSummary = entry.latestSummary || current.latestSummary;
+    }
+
+    if (strengthScore(entry.strongest) > strengthScore(current.strongest)) {
+      current.strongest = entry.strongest;
+    }
+  }
+
+  return [...mergedMap.values()].sort((left, right) => {
+    const retrievedOrder = compareTimestampDesc(left.latestRetrievedAt, right.latestRetrievedAt);
+    if (retrievedOrder !== 0) {
+      return retrievedOrder;
+    }
+
+    return right.signalCount - left.signalCount;
+  });
+}
+
 function CompanyIndexItem({
   entry,
   active,
@@ -395,9 +508,15 @@ function CompanyMetricCard({
 function DuplicateCandidatePanel({
   groups,
   onSelectCompany,
+  onConfirmMerge,
+  onIgnore,
+  pendingKey,
 }: {
   groups: CompanyDuplicateGroup[];
   onSelectCompany: (companyId: string) => void;
+  onConfirmMerge: (group: CompanyDuplicateGroup) => void;
+  onIgnore: (group: CompanyDuplicateGroup) => void;
+  pendingKey: string;
 }) {
   const { t } = useTranslation();
   const visibleGroups = groups.slice(0, 4);
@@ -442,6 +561,23 @@ function DuplicateCandidatePanel({
                   </button>
                 ))}
               </Space>
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <Button
+                  size="small"
+                  loading={pendingKey === `${group.duplicateKey}:ignored`}
+                  onClick={() => onIgnore(group)}
+                >
+                  {t("companies.duplicates.ignore")}
+                </Button>
+                <Button
+                  size="small"
+                  type="primary"
+                  loading={pendingKey === `${group.duplicateKey}:merged`}
+                  onClick={() => onConfirmMerge(group)}
+                >
+                  {t("companies.duplicates.confirm_merge")}
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -747,12 +883,37 @@ function CompanyProfile({
   entry,
   followUpRecord,
   profileRecord,
+  onSaveProfile,
 }: {
   entry: CompanyLibraryEntry | null;
   followUpRecord?: FollowUpRecord | null;
   profileRecord?: CompanyProfileRecord | null;
+  onSaveProfile: (profile: CompanyProfileRecord) => void;
 }) {
   const { t } = useTranslation();
+  const [form] = Form.useForm<CompanyProfileFormValues>();
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  useEffect(() => {
+    if (!entry || !profileModalOpen) {
+      return;
+    }
+
+    form.setFieldsValue({
+      industry: profileRecord?.industry ?? "",
+      scale: profileRecord?.scale ?? "",
+      website: profileRecord?.website ?? "",
+      address: profileRecord?.address ?? "",
+      contactName: profileRecord?.contactName ?? "",
+      contactMethod: profileRecord?.contactMethod ?? "",
+      owner: profileRecord?.owner ?? "",
+      level: profileRecord?.level ?? "",
+      status: profileRecord?.status ?? "",
+      tagsText: profileRecord?.tags?.join("，") ?? "",
+      note: profileRecord?.note ?? "",
+    });
+  }, [entry, form, profileModalOpen, profileRecord]);
 
   if (!entry) {
     return (
@@ -806,6 +967,42 @@ function CompanyProfile({
         }
       : null,
   ].filter((item): item is { title: string; detail: string; color: string } => Boolean(item));
+
+  async function saveProfile(values: CompanyProfileFormValues) {
+    if (!entry) {
+      return;
+    }
+
+    setProfileSaving(true);
+
+    try {
+      const response = await fetch(`/api/company-profiles/${encodeURIComponent(entry.id)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...values,
+          companyId: entry.id,
+          companyName: entry.companyName,
+          city: entry.city,
+          tags: parseProfileTags(values.tagsText),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save company profile: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as { item?: CompanyProfileRecord };
+      if (payload.item) {
+        onSaveProfile(payload.item);
+        setProfileModalOpen(false);
+      }
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -884,7 +1081,15 @@ function CompanyProfile({
             </div>
           </Card>
 
-          <Card size="small" title={t("companies.profile.master_title")}>
+          <Card
+            size="small"
+            title={t("companies.profile.master_title")}
+            extra={
+              <Button size="small" type="primary" onClick={() => setProfileModalOpen(true)}>
+                {t("companies.profile.edit")}
+              </Button>
+            }
+          >
             <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
               <CompanyProfileField
                 label={t("companies.profile.fields.industry")}
@@ -918,6 +1123,10 @@ function CompanyProfile({
                 label={t("companies.profile.fields.contact_method")}
                 value={profileRecord?.contactMethod || t("companies.profile.master_empty")}
               />
+              <CompanyProfileField
+                label={t("companies.profile.fields.owner")}
+                value={profileRecord?.owner || t("companies.profile.master_empty")}
+              />
             </div>
             <div className="mt-3 rounded-[1rem] border border-dashed border-(--color-line) bg-white/55 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -935,6 +1144,66 @@ function CompanyProfile({
               </Typography.Paragraph>
             </div>
           </Card>
+
+          <Modal
+            title={t("companies.profile.edit_title")}
+            open={profileModalOpen}
+            onCancel={() => setProfileModalOpen(false)}
+            onOk={() => form.submit()}
+            okText={t("companies.profile.save")}
+            cancelText={t("companies.profile.cancel")}
+            confirmLoading={profileSaving}
+            destroyOnHidden
+          >
+            <Form<CompanyProfileFormValues>
+              form={form}
+              layout="vertical"
+              onFinish={(values) => void saveProfile(values)}
+            >
+              <div className="grid gap-x-3 md:grid-cols-2">
+                <Form.Item name="industry" label={t("companies.profile.fields.industry")}>
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item name="scale" label={t("companies.profile.fields.scale")}>
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item name="level" label={t("companies.profile.fields.level")}>
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item name="status" label={t("companies.profile.fields.status")}>
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item name="website" label={t("companies.profile.fields.website")}>
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item name="address" label={t("companies.profile.fields.address")}>
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item name="contactName" label={t("companies.profile.fields.contact")}>
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item
+                  name="contactMethod"
+                  label={t("companies.profile.fields.contact_method")}
+                >
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item name="owner" label={t("companies.profile.fields.owner")}>
+                  <Input allowClear />
+                </Form.Item>
+                <Form.Item name="tagsText" label={t("companies.profile.fields.tags")}>
+                  <Input allowClear placeholder={t("companies.profile.tags_placeholder")} />
+                </Form.Item>
+              </div>
+              <Form.Item name="note" label={t("companies.profile.fields.note")}>
+                <Input.TextArea
+                  allowClear
+                  autoSize={{ minRows: 3, maxRows: 6 }}
+                  placeholder={t("companies.profile.note_placeholder")}
+                />
+              </Form.Item>
+            </Form>
+          </Modal>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(20rem,0.92fr)]">
             <Card size="small" title={t("companies.profile.summary_title")}>
@@ -1010,11 +1279,17 @@ export function CompanyLibraryPanel({
   records,
   profiles,
   duplicateGroups,
+  duplicateDecisions,
+  onSaveDuplicateDecision,
+  onSaveProfile,
 }: {
   entries: CompanyLibraryEntry[];
   records: FollowUpRecord[];
   profiles: CompanyProfileRecord[];
   duplicateGroups: CompanyDuplicateGroup[];
+  duplicateDecisions: CompanyDuplicateDecision[];
+  onSaveDuplicateDecision: (decision: CompanyDuplicateDecision) => void;
+  onSaveProfile: (profile: CompanyProfileRecord) => void;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -1022,8 +1297,16 @@ export function CompanyLibraryPanel({
   const [stageFilter, setStageFilter] = useState<CompanyStageFilter>("all");
   const [demandFilter, setDemandFilter] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(entries[0]?.id ?? null);
-  const totalSignalCount = useMemo(() => getEntryTotalSignalCount(entries), [entries]);
-  const totalJobCount = useMemo(() => getEntryTotalJobCount(entries), [entries]);
+  const [pendingDuplicateDecisionKey, setPendingDuplicateDecisionKey] = useState("");
+  const effectiveEntries = useMemo(
+    () => applyCompanyDuplicateDecisions(entries, duplicateDecisions),
+    [duplicateDecisions, entries]
+  );
+  const totalSignalCount = useMemo(
+    () => getEntryTotalSignalCount(effectiveEntries),
+    [effectiveEntries]
+  );
+  const totalJobCount = useMemo(() => getEntryTotalJobCount(effectiveEntries), [effectiveEntries]);
   const followUpRecordMap = useMemo(
     () => new Map(records.map((record) => [record.companyId, record])),
     [records]
@@ -1034,16 +1317,16 @@ export function CompanyLibraryPanel({
   );
   const cityOptions = useMemo(
     () =>
-      uniqueStrings(entries.map((entry) => entry.city)).map((city) => ({
+      uniqueStrings(effectiveEntries.map((entry) => entry.city)).map((city) => ({
         value: city,
         label: city,
       })),
-    [entries]
+    [effectiveEntries]
   );
   const demandOptions = useMemo(() => {
     const demandSet = new Set<string>();
 
-    for (const entry of entries) {
+    for (const entry of effectiveEntries) {
       const jobs = collectCompanyJobs(entry);
       for (const tag of collectCompanyDemandTags(entry, jobs)) {
         demandSet.add(tag);
@@ -1056,12 +1339,12 @@ export function CompanyLibraryPanel({
         value: tag,
         label: tag,
       }));
-  }, [entries]);
+  }, [effectiveEntries]);
 
   useEffect(() => {
     const targetId = new URLSearchParams(window.location.search).get("company");
 
-    if (!targetId || !entries.some((entry) => entry.id === targetId)) {
+    if (!targetId || !effectiveEntries.some((entry) => entry.id === targetId)) {
       return;
     }
 
@@ -1071,12 +1354,12 @@ export function CompanyLibraryPanel({
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [entries]);
+  }, [effectiveEntries]);
 
   const filteredEntries = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return entries.filter((entry) => {
+    return effectiveEntries.filter((entry) => {
       const record = followUpRecordMap.get(entry.id);
       const stage = record?.stage ?? resolveCompanyStage(entry);
       const demandTags = collectCompanyDemandTags(entry, collectCompanyJobs(entry));
@@ -1114,7 +1397,54 @@ export function CompanyLibraryPanel({
         .toLowerCase()
         .includes(normalizedQuery);
     });
-  }, [cityFilter, demandFilter, entries, followUpRecordMap, query, stageFilter]);
+  }, [cityFilter, demandFilter, effectiveEntries, followUpRecordMap, query, stageFilter]);
+
+  async function saveDuplicateDecision(group: CompanyDuplicateGroup, status: "merged" | "ignored") {
+    const canonicalCompany =
+      group.companies.find((company) => company.companyName === group.canonicalName) ??
+      group.companies[0];
+    const pendingKey = `${group.duplicateKey}:${status}`;
+    setPendingDuplicateDecisionKey(pendingKey);
+
+    try {
+      const response = await fetch(
+        `/api/company-duplicates/${encodeURIComponent(group.duplicateKey)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status,
+            canonicalCompanyId: status === "merged" ? canonicalCompany?.companyId : "",
+            canonicalCompanyName: status === "merged" ? group.canonicalName : "",
+            companyIds:
+              status === "merged" ? group.companies.map((company) => company.companyId) : [],
+            companyNames:
+              status === "merged" ? group.companies.map((company) => company.companyName) : [],
+            reason:
+              status === "merged"
+                ? t("companies.duplicates.merge_reason")
+                : t("companies.duplicates.ignore_reason"),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to save duplicate decision: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as { item?: CompanyDuplicateDecision };
+      if (payload.item) {
+        onSaveDuplicateDecision(payload.item);
+        if (status === "merged" && canonicalCompany?.companyId) {
+          setSelectedId(canonicalCompany.companyId);
+        }
+      }
+    } finally {
+      setPendingDuplicateDecisionKey("");
+    }
+  }
 
   const resolvedSelectedId =
     selectedId && filteredEntries.some((entry) => entry.id === selectedId)
@@ -1173,7 +1503,7 @@ export function CompanyLibraryPanel({
             <Typography.Text type="secondary">
               {t("companies.filters.result", {
                 count: filteredEntries.length,
-                total: entries.length,
+                total: effectiveEntries.length,
               })}
             </Typography.Text>
           </div>
@@ -1181,7 +1511,7 @@ export function CompanyLibraryPanel({
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
             <CompanyMetricCard
               title={t("companies.total_companies_metric")}
-              value={entries.length}
+              value={effectiveEntries.length}
               icon={<BankOutlined />}
             />
             <CompanyMetricCard
@@ -1202,6 +1532,9 @@ export function CompanyLibraryPanel({
               setQuery("");
               setSelectedId(companyId);
             }}
+            onConfirmMerge={(group) => void saveDuplicateDecision(group, "merged")}
+            onIgnore={(group) => void saveDuplicateDecision(group, "ignored")}
+            pendingKey={pendingDuplicateDecisionKey}
           />
 
           {filteredEntries.length ? (
@@ -1225,6 +1558,7 @@ export function CompanyLibraryPanel({
         entry={activeEntry}
         followUpRecord={activeFollowUpRecord}
         profileRecord={activeProfileRecord}
+        onSaveProfile={onSaveProfile}
       />
     </div>
   );

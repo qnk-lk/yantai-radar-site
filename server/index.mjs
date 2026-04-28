@@ -5,6 +5,8 @@ import { buildCompanyDuplicateCandidates } from "./lib/company-dedupe.mjs";
 
 import {
   initializeStore,
+  readCompanyDuplicateDecision,
+  readCompanyDuplicateDecisions,
   readCompanyProfile,
   readCompanyProfiles,
   readCompetitorUpdates,
@@ -14,6 +16,7 @@ import {
   readLeadAction,
   readLeadActions,
   resolveConfig,
+  upsertCompanyDuplicateDecision,
   upsertCompanyProfile,
   upsertFollowUpRecord,
   upsertLeadAction,
@@ -346,6 +349,9 @@ function buildApp(config, db) {
       followUpEvents: db.prepare("SELECT COUNT(*) AS count FROM follow_up_events").get().count,
       companyProfiles: db.prepare("SELECT COUNT(*) AS count FROM company_profiles").get().count,
       leadActions: db.prepare("SELECT COUNT(*) AS count FROM lead_actions").get().count,
+      companyDuplicateDecisions: db
+        .prepare("SELECT COUNT(*) AS count FROM company_duplicate_decisions")
+        .get().count,
       competitorMaster: db.prepare("SELECT COUNT(*) AS count FROM competitor_master").get().count,
       competitorSnapshots: db.prepare("SELECT COUNT(*) AS count FROM competitor_snapshots").get()
         .count,
@@ -444,16 +450,57 @@ function buildApp(config, db) {
     }
 
     const items = Array.isArray(document.payload?.feed) ? document.payload.feed : [];
-    const groups = buildCompanyDuplicateCandidates(items);
+    const decisions = readCompanyDuplicateDecisions(db);
+    const decisionMap = new Map(decisions.map((decision) => [decision.duplicateKey, decision]));
+    const groups = buildCompanyDuplicateCandidates(items).filter((group) => {
+      const decision = decisionMap.get(group.duplicateKey);
+      return !decision;
+    });
 
     return {
       groups,
+      decisions,
       totals: {
         groups: groups.length,
         companies: groups.reduce((total, group) => total + group.companies.length, 0),
+        decisions: decisions.length,
       },
       updatedAt: document.payload?.updatedAt ?? document.updatedAt,
     };
+  });
+
+  app.get("/api/company-duplicates/:duplicateKey", async (request, reply) => {
+    const item = readCompanyDuplicateDecision(db, request.params?.duplicateKey);
+
+    if (!item) {
+      reply.code(404);
+      return {
+        ok: false,
+        message: "Company duplicate decision not found",
+      };
+    }
+
+    return item;
+  });
+
+  app.put("/api/company-duplicates/:duplicateKey", async (request, reply) => {
+    try {
+      const item = upsertCompanyDuplicateDecision(db, {
+        ...(request.body ?? {}),
+        duplicateKey: request.params?.duplicateKey,
+      });
+
+      return {
+        ok: true,
+        item,
+      };
+    } catch (error) {
+      reply.code(400);
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Invalid company duplicate decision",
+      };
+    }
   });
 
   app.get("/api/topbar/context", async (request) => {

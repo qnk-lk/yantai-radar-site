@@ -104,11 +104,27 @@ export type CompanyDuplicateGroup = {
   companies: CompanyDuplicateCompany[];
 };
 
+export type CompanyDuplicateDecisionStatus = "merged" | "ignored";
+
+export type CompanyDuplicateDecision = {
+  duplicateKey: string;
+  status: CompanyDuplicateDecisionStatus;
+  canonicalCompanyId: string;
+  canonicalCompanyName: string;
+  companyIds: string[];
+  companyNames: string[];
+  reason: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CompanyDuplicatesPayload = {
   groups: CompanyDuplicateGroup[];
+  decisions?: CompanyDuplicateDecision[];
   totals?: {
     groups: number;
     companies: number;
+    decisions?: number;
   };
   updatedAt?: string;
 };

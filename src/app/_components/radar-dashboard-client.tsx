@@ -37,6 +37,7 @@ import { RadarTopNavigation } from "./radar-top-navigation";
 import { SalesIntelFeedPanel } from "./sales-intel-feed-panel";
 import { SalesIntelTodayPanel } from "./sales-intel-today-panel";
 import type {
+  CompanyDuplicateDecision,
   CompanyDuplicatesPayload,
   LeadActionRecord,
   LeadActionsPayload,
@@ -71,6 +72,7 @@ type ApiHealthPayload = {
     followUpEvents?: number;
     companyProfiles?: number;
     leadActions?: number;
+    companyDuplicateDecisions?: number;
     competitorMaster?: number;
     competitorSnapshots?: number;
     competitorUpdates?: number;
@@ -904,6 +906,10 @@ function SourcesPanel({
       value: tableCounts.leadActions ?? 0,
     },
     {
+      label: t("sources.tables.company_duplicate_decisions"),
+      value: tableCounts.companyDuplicateDecisions ?? 0,
+    },
+    {
       label: t("sources.tables.competitor_master"),
       value: tableCounts.competitorMaster ?? competitorData.competitors.length,
     },
@@ -1146,6 +1152,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
   const [leadActions, setLeadActions] = useState<LeadActionRecord[]>([]);
   const [companyDuplicates, setCompanyDuplicates] = useState<CompanyDuplicatesPayload>({
     groups: [],
+    decisions: [],
   });
   const [apiHealth, setApiHealth] = useState<ApiHealthPayload | null>(null);
   const [selectedMapCompetitorKey, setSelectedMapCompetitorKey] = useState<string | null>(null);
@@ -1235,7 +1242,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         companyDuplicatesResult.status === "fulfilled" &&
           Array.isArray(companyDuplicatesResult.value.groups)
           ? companyDuplicatesResult.value
-          : { groups: [] }
+          : { groups: [], decisions: [] }
       );
       setRecruitmentLeadsData(
         recruitmentLeadsResult.status === "fulfilled"
@@ -1257,7 +1264,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       setFollowUpRecords([]);
       setCompanyProfiles([]);
       setLeadActions([]);
-      setCompanyDuplicates({ groups: [] });
+      setCompanyDuplicates({ groups: [], decisions: [] });
       setRecruitmentLeadsData(fallbackRecruitmentLeadsData);
       setApiHealth(null);
       setIsInitialLoading(false);
@@ -1438,6 +1445,32 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
                   return current.map((item) => (item.itemId === record.itemId ? record : item));
                 });
               }}
+              onSaveFollowUpRecord={(record) => {
+                setFollowUpRecords((current) => {
+                  const exists = current.some((item) => item.companyId === record.companyId);
+
+                  if (!exists) {
+                    return [record, ...current];
+                  }
+
+                  return current.map((item) =>
+                    item.companyId === record.companyId ? record : item
+                  );
+                });
+              }}
+              onSaveCompanyProfile={(profile) => {
+                setCompanyProfiles((current) => {
+                  const exists = current.some((item) => item.companyId === profile.companyId);
+
+                  if (!exists) {
+                    return [profile, ...current];
+                  }
+
+                  return current.map((item) =>
+                    item.companyId === profile.companyId ? profile : item
+                  );
+                });
+              }}
             />
             <SalesIntelTodayPanel
               items={salesIntelData.todayHighlights}
@@ -1453,6 +1486,42 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
             records={followUpRecords}
             profiles={companyProfiles}
             duplicateGroups={companyDuplicates.groups}
+            duplicateDecisions={companyDuplicates.decisions ?? []}
+            onSaveProfile={(profile: CompanyProfileRecord) => {
+              setCompanyProfiles((current) => {
+                const exists = current.some((item) => item.companyId === profile.companyId);
+
+                if (!exists) {
+                  return [profile, ...current];
+                }
+
+                return current.map((item) =>
+                  item.companyId === profile.companyId ? profile : item
+                );
+              });
+            }}
+            onSaveDuplicateDecision={(decision: CompanyDuplicateDecision) => {
+              setCompanyDuplicates((current) => {
+                const currentDecisions = current.decisions ?? [];
+                const exists = currentDecisions.some(
+                  (item) => item.duplicateKey === decision.duplicateKey
+                );
+                const nextDecisions = exists
+                  ? currentDecisions.map((item) =>
+                      item.duplicateKey === decision.duplicateKey ? decision : item
+                    )
+                  : [decision, ...currentDecisions];
+                const nextGroups = current.groups.filter(
+                  (group) => group.duplicateKey !== decision.duplicateKey
+                );
+
+                return {
+                  ...current,
+                  groups: nextGroups,
+                  decisions: nextDecisions,
+                };
+              });
+            }}
           />
         );
       case "competitors":

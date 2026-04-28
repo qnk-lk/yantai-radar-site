@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SalesIntelDetailModal } from "./sales-intel-detail-modal";
+import type { CompanyProfileRecord } from "./company-library-panel";
+import type { FollowUpRecord } from "./follow-up-types";
 import type {
   LeadActionRecord,
   LeadActionStatus,
@@ -60,7 +62,10 @@ function getActionColor(status?: LeadActionStatus) {
 }
 
 function normalizePublishedAtCandidate(value: string) {
-  return value.replace(/^更新于\s*/u, "").replace(/\s*CST$/u, "").trim();
+  return value
+    .replace(/^更新于\s*/u, "")
+    .replace(/\s*CST$/u, "")
+    .trim();
 }
 
 function isDisplayPublishedAt(value: string) {
@@ -75,20 +80,14 @@ function isDisplayPublishedAt(value: string) {
 }
 
 function getDisplayPublishedAt(item: SalesIntelItem) {
-  const candidates = [
-    item.publishedAt,
-    ...(item.matchedJobs ?? []).map((job) => job.publishedAt),
-  ]
+  const candidates = [item.publishedAt, ...(item.matchedJobs ?? []).map((job) => job.publishedAt)]
     .map((value) => normalizePublishedAtCandidate(value))
     .filter(Boolean);
 
   return candidates.find((value) => isDisplayPublishedAt(value)) || "";
 }
 
-function getDisplayRetrievedAt(
-  retrievedAt?: string | null,
-  fallbackRetrievedAt?: string | null
-) {
+function getDisplayRetrievedAt(retrievedAt?: string | null, fallbackRetrievedAt?: string | null) {
   const value = retrievedAt || fallbackRetrievedAt || "";
   return value ? formatDisplayUpdatedAt(value) : "";
 }
@@ -176,7 +175,9 @@ function FeedRow({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-(--color-line) pt-4">
         <div className="flex flex-wrap gap-2">
           {action?.status ? (
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getActionColor(action.status)}`}>
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getActionColor(action.status)}`}
+            >
               {t(`sales_intel.actions.statuses.${action.status}`)}
             </span>
           ) : (
@@ -224,10 +225,14 @@ export function SalesIntelFeedPanel({
   data,
   leadActions,
   onSaveLeadAction,
+  onSaveFollowUpRecord,
+  onSaveCompanyProfile,
 }: {
   data: SalesIntelData;
   leadActions: LeadActionRecord[];
   onSaveLeadAction: (record: LeadActionRecord) => void;
+  onSaveFollowUpRecord: (record: FollowUpRecord) => void;
+  onSaveCompanyProfile: (profile: CompanyProfileRecord) => void;
 }) {
   const { t } = useTranslation();
   const [activeItem, setActiveItem] = useState<SalesIntelItem | null>(null);
@@ -248,38 +253,52 @@ export function SalesIntelFeedPanel({
     setPendingActionId(`${item.id}:${status}`);
     try {
       if (status === "follow_up") {
-        await requestJson(`/api/follow-ups/${encodeURIComponent(companyId)}`, {
-          companyName,
-          city,
-          stage: item.strength === "高" ? "priority" : "watch",
-          contactResult: "not_contacted",
-          nextAction: item.actionText || item.summary,
-          dealStage: "lead",
-          nextReminderAt: "",
-          reminderStatus: "open",
-          completedAt: "",
-          note: item.summary,
-          lastFollowedAt: "",
-        });
+        const followUpPayload = await requestJson<{ item: FollowUpRecord }>(
+          `/api/follow-ups/${encodeURIComponent(companyId)}`,
+          {
+            companyName,
+            city,
+            stage: item.strength === "高" ? "priority" : "watch",
+            contactResult: "not_contacted",
+            nextAction: item.actionText || item.summary,
+            dealStage: "lead",
+            nextReminderAt: "",
+            reminderStatus: "open",
+            completedAt: "",
+            note: item.summary,
+            lastFollowedAt: "",
+          }
+        );
+
+        if (followUpPayload.item) {
+          onSaveFollowUpRecord(followUpPayload.item);
+        }
       }
 
       if (status === "company") {
-        await requestJson(`/api/company-profiles/${encodeURIComponent(companyId)}`, {
-          companyName,
-          city,
-          industry: item.category,
-          status: t("sales_intel.actions.company_profile_status"),
-          tags: item.tags,
-          note: item.summary,
-        });
+        const profilePayload = await requestJson<{ item: CompanyProfileRecord }>(
+          `/api/company-profiles/${encodeURIComponent(companyId)}`,
+          {
+            companyName,
+            city,
+            industry: item.category,
+            status: t("sales_intel.actions.company_profile_status"),
+            tags: item.tags,
+            note: item.summary,
+          }
+        );
+
+        if (profilePayload.item) {
+          onSaveCompanyProfile(profilePayload.item);
+        }
       }
 
       const payload = await requestJson<{ item: LeadActionRecord }>(
         `/api/lead-actions/${encodeURIComponent(item.id)}`,
         {
           status,
-          companyId,
           companyName,
+          companyId,
           note: item.summary,
         }
       );

@@ -33,6 +33,7 @@ const FOLLOW_UP_DEAL_STAGES = new Set([
 ]);
 const FOLLOW_UP_REMINDER_STATUSES = new Set(["open", "completed"]);
 const LEAD_ACTION_STATUSES = new Set(["useful", "invalid", "follow_up", "company"]);
+const COMPANY_DUPLICATE_DECISION_STATUSES = new Set(["merged", "ignored"]);
 const FOLLOW_UP_EXTRA_COLUMNS = [
   ["communication_method", "TEXT NOT NULL DEFAULT ''"],
   ["contact_result", "TEXT NOT NULL DEFAULT ''"],
@@ -400,6 +401,45 @@ function normalizeLeadActionInput(input) {
     companyId: normalizeText(input?.companyId),
     companyName: normalizeText(input?.companyName),
     note: normalizeText(input?.note),
+    updatedAt: normalizeText(input?.updatedAt, now),
+  };
+}
+
+function normalizeCompanyDuplicateDecision(row) {
+  return {
+    duplicateKey: row.duplicate_key,
+    status: row.status,
+    canonicalCompanyId: row.canonical_company_id,
+    canonicalCompanyName: row.canonical_company_name,
+    companyIds: parseJsonText(row.company_ids, []),
+    companyNames: parseJsonText(row.company_names, []),
+    reason: row.reason,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeCompanyDuplicateDecisionInput(input) {
+  const now = new Date().toISOString();
+  const duplicateKey = normalizeText(input?.duplicateKey);
+
+  if (!duplicateKey) {
+    throw new Error("duplicateKey is required");
+  }
+
+  const status = normalizeEnumValue(input?.status, COMPANY_DUPLICATE_DECISION_STATUSES);
+  if (!status) {
+    throw new Error("status is required");
+  }
+
+  return {
+    duplicateKey,
+    status,
+    canonicalCompanyId: normalizeText(input?.canonicalCompanyId),
+    canonicalCompanyName: normalizeText(input?.canonicalCompanyName),
+    companyIds: normalizeStringList(input?.companyIds),
+    companyNames: normalizeStringList(input?.companyNames),
+    reason: normalizeText(input?.reason),
     updatedAt: normalizeText(input?.updatedAt, now),
   };
 }
@@ -1037,6 +1077,18 @@ export function ensureSchema(db) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS company_duplicate_decisions (
+      duplicate_key TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      canonical_company_id TEXT NOT NULL DEFAULT '',
+      canonical_company_name TEXT NOT NULL DEFAULT '',
+      company_ids TEXT NOT NULL DEFAULT '[]',
+      company_names TEXT NOT NULL DEFAULT '[]',
+      reason TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_competitor_master_active
       ON competitor_master (is_active, city, latest_rank);
 
@@ -1060,6 +1112,9 @@ export function ensureSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_lead_actions_status
       ON lead_actions (status, updated_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_company_duplicate_decisions_status
+      ON company_duplicate_decisions (status, updated_at DESC);
   `);
 
   for (const [columnName, columnDefinition] of FOLLOW_UP_EXTRA_COLUMNS) {
@@ -1268,6 +1323,93 @@ export function upsertLeadAction(db, input) {
   return readLeadAction(db, action.itemId);
 }
 
+export function readCompanyDuplicateDecisions(db) {
+  return db
+    .prepare(
+      `
+        SELECT
+          duplicate_key,
+          status,
+          canonical_company_id,
+          canonical_company_name,
+          company_ids,
+          company_names,
+          reason,
+          created_at,
+          updated_at
+        FROM company_duplicate_decisions
+        ORDER BY updated_at DESC, duplicate_key ASC
+      `
+    )
+    .all()
+    .map(normalizeCompanyDuplicateDecision);
+}
+
+export function readCompanyDuplicateDecision(db, duplicateKey) {
+  const row = db
+    .prepare(
+      `
+        SELECT
+          duplicate_key,
+          status,
+          canonical_company_id,
+          canonical_company_name,
+          company_ids,
+          company_names,
+          reason,
+          created_at,
+          updated_at
+        FROM company_duplicate_decisions
+        WHERE duplicate_key = ?
+      `
+    )
+    .get(normalizeText(duplicateKey));
+
+  return row ? normalizeCompanyDuplicateDecision(row) : null;
+}
+
+export function upsertCompanyDuplicateDecision(db, input) {
+  const decision = normalizeCompanyDuplicateDecisionInput(input);
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `
+      INSERT INTO company_duplicate_decisions (
+        duplicate_key,
+        status,
+        canonical_company_id,
+        canonical_company_name,
+        company_ids,
+        company_names,
+        reason,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(duplicate_key) DO UPDATE SET
+        status = excluded.status,
+        canonical_company_id = excluded.canonical_company_id,
+        canonical_company_name = excluded.canonical_company_name,
+        company_ids = excluded.company_ids,
+        company_names = excluded.company_names,
+        reason = excluded.reason,
+        updated_at = excluded.updated_at
+    `
+  ).run(
+    decision.duplicateKey,
+    decision.status,
+    decision.canonicalCompanyId,
+    decision.canonicalCompanyName,
+    JSON.stringify(decision.companyIds),
+    JSON.stringify(decision.companyNames),
+    decision.reason,
+    now,
+    decision.updatedAt
+  );
+
+  return readCompanyDuplicateDecision(db, decision.duplicateKey);
+}
+
 export function hasDocument(db, key) {
   const row = db.prepare("SELECT key FROM documents WHERE key = ?").get(key);
   return Boolean(row);
@@ -1427,9 +1569,7 @@ export function readFollowUpRecord(db, companyId) {
 }
 
 export function readFollowUpEvents(db, companyId, limit = 20) {
-  const safeLimit = Number.isFinite(limit)
-    ? Math.max(1, Math.min(100, Math.trunc(limit)))
-    : 20;
+  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(100, Math.trunc(limit))) : 20;
 
   return db
     .prepare(
