@@ -1,6 +1,8 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 
+import { buildCompanyDuplicateCandidates } from "./lib/company-dedupe.mjs";
+
 import {
   initializeStore,
   readCompanyProfile,
@@ -9,9 +11,12 @@ import {
   readDocument,
   readFollowUpRecord,
   readFollowUpRecords,
+  readLeadAction,
+  readLeadActions,
   resolveConfig,
   upsertCompanyProfile,
   upsertFollowUpRecord,
+  upsertLeadAction,
 } from "./lib/store.mjs";
 
 const DEFAULT_TOPBAR_CONTEXT = Object.freeze({
@@ -340,8 +345,10 @@ function buildApp(config, db) {
       followUpRecords: db.prepare("SELECT COUNT(*) AS count FROM follow_up_records").get().count,
       followUpEvents: db.prepare("SELECT COUNT(*) AS count FROM follow_up_events").get().count,
       companyProfiles: db.prepare("SELECT COUNT(*) AS count FROM company_profiles").get().count,
+      leadActions: db.prepare("SELECT COUNT(*) AS count FROM lead_actions").get().count,
       competitorMaster: db.prepare("SELECT COUNT(*) AS count FROM competitor_master").get().count,
-      competitorSnapshots: db.prepare("SELECT COUNT(*) AS count FROM competitor_snapshots").get().count,
+      competitorSnapshots: db.prepare("SELECT COUNT(*) AS count FROM competitor_snapshots").get()
+        .count,
       competitorUpdates: db.prepare("SELECT COUNT(*) AS count FROM competitor_updates").get().count,
     };
 
@@ -423,6 +430,30 @@ function buildApp(config, db) {
     }
 
     return item;
+  });
+
+  app.get("/api/company-duplicates", async (_request, reply) => {
+    const document = readDocument(db, "salesIntel");
+
+    if (!document) {
+      reply.code(404);
+      return {
+        ok: false,
+        message: "Sales intel data not found",
+      };
+    }
+
+    const items = Array.isArray(document.payload?.feed) ? document.payload.feed : [];
+    const groups = buildCompanyDuplicateCandidates(items);
+
+    return {
+      groups,
+      totals: {
+        groups: groups.length,
+        companies: groups.reduce((total, group) => total + group.companies.length, 0),
+      },
+      updatedAt: document.payload?.updatedAt ?? document.updatedAt,
+    };
   });
 
   app.get("/api/topbar/context", async (request) => {
@@ -533,6 +564,51 @@ function buildApp(config, db) {
       return {
         ok: false,
         message: error instanceof Error ? error.message : "Invalid company profile",
+      };
+    }
+  });
+
+  app.get("/api/lead-actions", async () => {
+    const items = readLeadActions(db);
+
+    return {
+      items,
+      totals: {
+        overall: items.length,
+      },
+    };
+  });
+
+  app.get("/api/lead-actions/:itemId", async (request, reply) => {
+    const item = readLeadAction(db, request.params?.itemId);
+
+    if (!item) {
+      reply.code(404);
+      return {
+        ok: false,
+        message: "Lead action not found",
+      };
+    }
+
+    return item;
+  });
+
+  app.put("/api/lead-actions/:itemId", async (request, reply) => {
+    try {
+      const item = upsertLeadAction(db, {
+        ...(request.body ?? {}),
+        itemId: request.params?.itemId,
+      });
+
+      return {
+        ok: true,
+        item,
+      };
+    } catch (error) {
+      reply.code(400);
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Invalid lead action",
       };
     }
   });

@@ -36,7 +36,13 @@ import { LocationWeatherClock } from "./location-weather-clock";
 import { RadarTopNavigation } from "./radar-top-navigation";
 import { SalesIntelFeedPanel } from "./sales-intel-feed-panel";
 import { SalesIntelTodayPanel } from "./sales-intel-today-panel";
-import type { SalesIntelData, SalesIntelItem } from "./sales-intel-types";
+import type {
+  CompanyDuplicatesPayload,
+  LeadActionRecord,
+  LeadActionsPayload,
+  SalesIntelData,
+  SalesIntelItem,
+} from "./sales-intel-types";
 import { DashboardLoadingSkeleton } from "./dashboard-loading-skeleton";
 import { FollowUpManagementPanel } from "./follow-up-management-panel";
 import type { FollowUpRecord, FollowUpRecordsPayload } from "./follow-up-types";
@@ -64,6 +70,7 @@ type ApiHealthPayload = {
     followUpRecords?: number;
     followUpEvents?: number;
     companyProfiles?: number;
+    leadActions?: number;
     competitorMaster?: number;
     competitorSnapshots?: number;
     competitorUpdates?: number;
@@ -99,6 +106,9 @@ type CompanyProfilesPayload = {
     overall: number;
   };
 };
+
+type LeadActionsResponsePayload = LeadActionsPayload;
+type CompanyDuplicatesResponsePayload = CompanyDuplicatesPayload;
 
 const fallbackAdminIndex: ChinaAdminIndex = {};
 
@@ -890,6 +900,10 @@ function SourcesPanel({
       value: tableCounts.companyProfiles ?? companyProfiles.length,
     },
     {
+      label: t("sources.tables.lead_actions"),
+      value: tableCounts.leadActions ?? 0,
+    },
+    {
       label: t("sources.tables.competitor_master"),
       value: tableCounts.competitorMaster ?? competitorData.competitors.length,
     },
@@ -952,7 +966,10 @@ function SourcesPanel({
                       <Typography.Text strong>{item.title}</Typography.Text>
                       {renderFreshnessTag(item.updatedAt)}
                     </div>
-                    <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                    <Typography.Paragraph
+                      type="secondary"
+                      style={{ marginTop: 8, marginBottom: 0 }}
+                    >
                       {item.detail}
                     </Typography.Paragraph>
                   </div>
@@ -999,9 +1016,7 @@ function SourcesPanel({
             <MetricCard
               label={t("sources.health.api_status")}
               value={apiHealth?.ok ? t("sources.health.online") : t("sources.health.unknown")}
-              detail={
-                apiHealth?.ok ? t("sources.health.api_ok") : t("sources.health.api_unknown")
-              }
+              detail={apiHealth?.ok ? t("sources.health.api_ok") : t("sources.health.api_unknown")}
             />
             <MetricCard
               label={t("sources.health.server_time")}
@@ -1046,7 +1061,11 @@ function SourcesPanel({
                 <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
                   {item.querySummary || t("sources.platforms.no_query")}
                 </Typography.Paragraph>
-                <Typography.Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
+                <Typography.Paragraph
+                  type="secondary"
+                  ellipsis={{ rows: 2 }}
+                  style={{ marginBottom: 0 }}
+                >
                   {item.note || t("sources.platforms.no_note")}
                 </Typography.Paragraph>
               </div>
@@ -1124,6 +1143,10 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
   const [adminIndex, setAdminIndex] = useState<ChinaAdminIndex>(fallbackAdminIndex);
   const [followUpRecords, setFollowUpRecords] = useState<FollowUpRecord[]>([]);
   const [companyProfiles, setCompanyProfiles] = useState<CompanyProfileRecord[]>([]);
+  const [leadActions, setLeadActions] = useState<LeadActionRecord[]>([]);
+  const [companyDuplicates, setCompanyDuplicates] = useState<CompanyDuplicatesPayload>({
+    groups: [],
+  });
   const [apiHealth, setApiHealth] = useState<ApiHealthPayload | null>(null);
   const [selectedMapCompetitorKey, setSelectedMapCompetitorKey] = useState<string | null>(null);
   const [expandedCompetitorKey, setExpandedCompetitorKey] = useState<string | null>(null);
@@ -1139,37 +1162,45 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
     async function loadData() {
       setIsInitialLoading(true);
 
-        const [
-          salesResult,
-          competitorResult,
-          adminIndexResult,
-          followUpResult,
-          companyProfilesResult,
-          recruitmentLeadsResult,
-          healthResult,
-        ] = await Promise.allSettled([
-            loadJsonWithFallback<SalesIntelData>(createRemoteOnlyDataSources("/api/sales/intel")),
-            loadJsonWithFallback<CompetitorData>(
-              createDataSources("/api/competitors", "/competitors.json")
-          ),
-          loadJsonWithFallback<ChinaAdminIndex>(
-            createDataSources("/api/admin/divisions", "/china-admin-divisions.json")
-          ),
-            loadJsonWithFallback<FollowUpRecordsPayload>(
-              createRemoteOnlyDataSources("/api/follow-ups")
-            ),
-            loadJsonWithFallback<CompanyProfilesPayload>(
-              createRemoteOnlyDataSources("/api/company-profiles")
-            ),
-            view === "sources"
-              ? loadJsonWithFallback<RecruitmentLeadsPayload>(
-                  createRemoteOnlyDataSources("/api/recruitment/leads")
-                )
-              : Promise.resolve(fallbackRecruitmentLeadsData),
-            view === "sources"
-              ? loadJsonWithFallback<ApiHealthPayload>(createRemoteOnlyDataSources("/api/health"))
-              : Promise.resolve(null),
-        ]);
+      const [
+        salesResult,
+        competitorResult,
+        adminIndexResult,
+        followUpResult,
+        companyProfilesResult,
+        leadActionsResult,
+        companyDuplicatesResult,
+        recruitmentLeadsResult,
+        healthResult,
+      ] = await Promise.allSettled([
+        loadJsonWithFallback<SalesIntelData>(createRemoteOnlyDataSources("/api/sales/intel")),
+        loadJsonWithFallback<CompetitorData>(
+          createDataSources("/api/competitors", "/competitors.json")
+        ),
+        loadJsonWithFallback<ChinaAdminIndex>(
+          createDataSources("/api/admin/divisions", "/china-admin-divisions.json")
+        ),
+        loadJsonWithFallback<FollowUpRecordsPayload>(
+          createRemoteOnlyDataSources("/api/follow-ups")
+        ),
+        loadJsonWithFallback<CompanyProfilesPayload>(
+          createRemoteOnlyDataSources("/api/company-profiles")
+        ),
+        loadJsonWithFallback<LeadActionsResponsePayload>(
+          createRemoteOnlyDataSources("/api/lead-actions")
+        ),
+        loadJsonWithFallback<CompanyDuplicatesResponsePayload>(
+          createRemoteOnlyDataSources("/api/company-duplicates")
+        ),
+        view === "sources"
+          ? loadJsonWithFallback<RecruitmentLeadsPayload>(
+              createRemoteOnlyDataSources("/api/recruitment/leads")
+            )
+          : Promise.resolve(fallbackRecruitmentLeadsData),
+        view === "sources"
+          ? loadJsonWithFallback<ApiHealthPayload>(createRemoteOnlyDataSources("/api/health"))
+          : Promise.resolve(null),
+      ]);
 
       if (!active) {
         return;
@@ -1184,23 +1215,34 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       setAdminIndex(
         adminIndexResult.status === "fulfilled" ? adminIndexResult.value : fallbackAdminIndex
       );
-        setFollowUpRecords(
-          followUpResult.status === "fulfilled" && Array.isArray(followUpResult.value.items)
-            ? followUpResult.value.items
-            : []
-        );
-        setCompanyProfiles(
-          companyProfilesResult.status === "fulfilled" &&
-            Array.isArray(companyProfilesResult.value.items)
-            ? companyProfilesResult.value.items
-            : []
-        );
-        setRecruitmentLeadsData(
-          recruitmentLeadsResult.status === "fulfilled"
-            ? recruitmentLeadsResult.value
-            : fallbackRecruitmentLeadsData
-        );
-        setApiHealth(healthResult.status === "fulfilled" ? (healthResult.value ?? null) : null);
+      setFollowUpRecords(
+        followUpResult.status === "fulfilled" && Array.isArray(followUpResult.value.items)
+          ? followUpResult.value.items
+          : []
+      );
+      setCompanyProfiles(
+        companyProfilesResult.status === "fulfilled" &&
+          Array.isArray(companyProfilesResult.value.items)
+          ? companyProfilesResult.value.items
+          : []
+      );
+      setLeadActions(
+        leadActionsResult.status === "fulfilled" && Array.isArray(leadActionsResult.value.items)
+          ? leadActionsResult.value.items
+          : []
+      );
+      setCompanyDuplicates(
+        companyDuplicatesResult.status === "fulfilled" &&
+          Array.isArray(companyDuplicatesResult.value.groups)
+          ? companyDuplicatesResult.value
+          : { groups: [] }
+      );
+      setRecruitmentLeadsData(
+        recruitmentLeadsResult.status === "fulfilled"
+          ? recruitmentLeadsResult.value
+          : fallbackRecruitmentLeadsData
+      );
+      setApiHealth(healthResult.status === "fulfilled" ? (healthResult.value ?? null) : null);
       setIsInitialLoading(false);
     }
 
@@ -1211,11 +1253,13 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
 
       setSalesIntelData(fallbackSalesIntelData);
       setCompetitorData(fallbackCompetitorData);
-        setAdminIndex(fallbackAdminIndex);
-        setFollowUpRecords([]);
-        setCompanyProfiles([]);
-        setRecruitmentLeadsData(fallbackRecruitmentLeadsData);
-        setApiHealth(null);
+      setAdminIndex(fallbackAdminIndex);
+      setFollowUpRecords([]);
+      setCompanyProfiles([]);
+      setLeadActions([]);
+      setCompanyDuplicates({ groups: [] });
+      setRecruitmentLeadsData(fallbackRecruitmentLeadsData);
+      setApiHealth(null);
       setIsInitialLoading(false);
     });
 
@@ -1380,7 +1424,21 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       case "leads":
         return (
           <>
-            <SalesIntelFeedPanel data={salesIntelData} />
+            <SalesIntelFeedPanel
+              data={salesIntelData}
+              leadActions={leadActions}
+              onSaveLeadAction={(record) => {
+                setLeadActions((current) => {
+                  const exists = current.some((item) => item.itemId === record.itemId);
+
+                  if (!exists) {
+                    return [record, ...current];
+                  }
+
+                  return current.map((item) => (item.itemId === record.itemId ? record : item));
+                });
+              }}
+            />
             <SalesIntelTodayPanel
               items={salesIntelData.todayHighlights}
               updatedAt={salesIntelData.updatedAt}
@@ -1394,6 +1452,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
             entries={followUpCompanyEntries}
             records={followUpRecords}
             profiles={companyProfiles}
+            duplicateGroups={companyDuplicates.groups}
           />
         );
       case "competitors":
@@ -1462,14 +1521,14 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         );
       case "sources":
         return (
-            <SourcesPanel
-              salesIntelData={salesIntelData}
-              competitorData={competitorData}
-              followUpRecords={followUpRecords}
-              companyProfiles={companyProfiles}
-              recruitmentLeadsData={recruitmentLeadsData}
-              apiHealth={apiHealth}
-            />
+          <SourcesPanel
+            salesIntelData={salesIntelData}
+            competitorData={competitorData}
+            followUpRecords={followUpRecords}
+            companyProfiles={companyProfiles}
+            recruitmentLeadsData={recruitmentLeadsData}
+            apiHealth={apiHealth}
+          />
         );
       default:
         return (

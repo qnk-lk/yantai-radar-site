@@ -523,7 +523,11 @@ function buildReportItems(radarPayload) {
 }
 
 function buildRecruitmentItems(recruitmentPayload) {
-  const leads = Array.isArray(recruitmentPayload?.leads) ? recruitmentPayload.leads : [];
+  const leads = Array.isArray(recruitmentPayload?.allLeads)
+    ? recruitmentPayload.allLeads
+    : Array.isArray(recruitmentPayload?.leads)
+      ? recruitmentPayload.leads
+      : [];
   const updatedAt = sanitizeText(recruitmentPayload?.updatedAt);
   return filterExcludedEntities(
     leads.map((lead, index) => transformRecruitmentLead(lead, updatedAt, index))

@@ -63,3 +63,52 @@ export type SalesIntelData = {
   feed: SalesIntelItem[];
   todayHighlights: SalesIntelItem[];
 };
+
+export type LeadActionStatus = "useful" | "invalid" | "follow_up" | "company";
+
+export type LeadActionRecord = {
+  itemId: string;
+  status: LeadActionStatus;
+  companyId: string;
+  companyName: string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LeadActionsPayload = {
+  items: LeadActionRecord[];
+  totals?: {
+    overall: number;
+  };
+};
+
+export type CompanyDuplicateCompany = {
+  companyId: string;
+  companyName: string;
+  city: string;
+  duplicateKey: string;
+  latestRetrievedAt: string;
+  signalCount: number;
+  sourcePlatforms: string[];
+  sampleTitle: string;
+  sampleSummary: string;
+};
+
+export type CompanyDuplicateGroup = {
+  id: string;
+  duplicateKey: string;
+  canonicalName: string;
+  confidence: number;
+  reasons: string[];
+  companies: CompanyDuplicateCompany[];
+};
+
+export type CompanyDuplicatesPayload = {
+  groups: CompanyDuplicateGroup[];
+  totals?: {
+    groups: number;
+    companies: number;
+  };
+  updatedAt?: string;
+};

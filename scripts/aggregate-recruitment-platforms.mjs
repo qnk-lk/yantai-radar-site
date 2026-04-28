@@ -272,7 +272,7 @@ async function main() {
     }
   }
 
-  const leads = [...leadMap.values()]
+  const sortedLeads = [...leadMap.values()]
     .filter((lead) => !objectMentionsExcludedEntity(lead))
     .sort((left, right) => {
       const noveltyDifference =
@@ -296,14 +296,23 @@ async function main() {
 
       return getSortKey(right.retrievedAt).localeCompare(getSortKey(left.retrievedAt));
     })
-    .slice(0, Number.isFinite(leadLimit) ? leadLimit : 10)
     .map((lead, index) => ({
       ...lead,
       isHistoricalDuplicate: historyKeySet.has(createLeadHistoryKey(lead)),
       rank: index + 1,
     }));
+  const safeLeadLimit = Number.isFinite(leadLimit) ? leadLimit : 10;
+  const leads = sortedLeads.slice(0, safeLeadLimit).map((lead, index) => ({
+    ...lead,
+    rank: index + 1,
+  }));
+  const allLeads = sortedLeads.map((lead, index) => ({
+    ...lead,
+    rank: index + 1,
+  }));
 
   const newLeadCount = leads.filter((lead) => !lead.isHistoricalDuplicate).length;
+  const allNewLeadCount = allLeads.filter((lead) => !lead.isHistoricalDuplicate).length;
 
   const mergedPayload = {
     updatedAt: getShanghaiUpdatedAt(),
@@ -316,9 +325,13 @@ async function main() {
       historyAware: Boolean(historyPath),
       newLeadCount,
       duplicateLeadCount: leads.length - newLeadCount,
+      totalLeadCount: allLeads.length,
+      allNewLeadCount,
+      allDuplicateLeadCount: allLeads.length - allNewLeadCount,
     },
     platformCoverage,
     leads,
+    allLeads,
   };
 
   await fs.mkdir(path.dirname(outputPath), { recursive: true });

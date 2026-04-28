@@ -32,6 +32,7 @@ const FOLLOW_UP_DEAL_STAGES = new Set([
   "lost",
 ]);
 const FOLLOW_UP_REMINDER_STATUSES = new Set(["open", "completed"]);
+const LEAD_ACTION_STATUSES = new Set(["useful", "invalid", "follow_up", "company"]);
 const FOLLOW_UP_EXTRA_COLUMNS = [
   ["communication_method", "TEXT NOT NULL DEFAULT ''"],
   ["contact_result", "TEXT NOT NULL DEFAULT ''"],
@@ -363,6 +364,41 @@ function normalizeCompanyProfileInput(input) {
     level: normalizeText(input?.level),
     status: normalizeText(input?.status),
     tags: normalizeStringList(input?.tags),
+    note: normalizeText(input?.note),
+    updatedAt: normalizeText(input?.updatedAt, now),
+  };
+}
+
+function normalizeLeadAction(row) {
+  return {
+    itemId: row.item_id,
+    status: row.status,
+    companyId: row.company_id,
+    companyName: row.company_name,
+    note: row.note,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeLeadActionInput(input) {
+  const now = new Date().toISOString();
+  const itemId = normalizeText(input?.itemId);
+
+  if (!itemId) {
+    throw new Error("itemId is required");
+  }
+
+  const status = normalizeEnumValue(input?.status, LEAD_ACTION_STATUSES);
+  if (!status) {
+    throw new Error("status is required");
+  }
+
+  return {
+    itemId,
+    status,
+    companyId: normalizeText(input?.companyId),
+    companyName: normalizeText(input?.companyName),
     note: normalizeText(input?.note),
     updatedAt: normalizeText(input?.updatedAt, now),
   };
@@ -991,6 +1027,16 @@ export function ensureSchema(db) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS lead_actions (
+      item_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      company_id TEXT NOT NULL DEFAULT '',
+      company_name TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_competitor_master_active
       ON competitor_master (is_active, city, latest_rank);
 
@@ -1011,6 +1057,9 @@ export function ensureSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_company_profiles_city
       ON company_profiles (city, updated_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_lead_actions_status
+      ON lead_actions (status, updated_at DESC);
   `);
 
   for (const [columnName, columnDefinition] of FOLLOW_UP_EXTRA_COLUMNS) {
@@ -1140,6 +1189,83 @@ export function upsertCompanyProfile(db, input) {
   );
 
   return readCompanyProfile(db, profile.companyId);
+}
+
+export function readLeadActions(db) {
+  return db
+    .prepare(
+      `
+        SELECT
+          item_id,
+          status,
+          company_id,
+          company_name,
+          note,
+          created_at,
+          updated_at
+        FROM lead_actions
+        ORDER BY updated_at DESC
+      `
+    )
+    .all()
+    .map(normalizeLeadAction);
+}
+
+export function readLeadAction(db, itemId) {
+  const row = db
+    .prepare(
+      `
+        SELECT
+          item_id,
+          status,
+          company_id,
+          company_name,
+          note,
+          created_at,
+          updated_at
+        FROM lead_actions
+        WHERE item_id = ?
+      `
+    )
+    .get(normalizeText(itemId));
+
+  return row ? normalizeLeadAction(row) : null;
+}
+
+export function upsertLeadAction(db, input) {
+  const action = normalizeLeadActionInput(input);
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `
+      INSERT INTO lead_actions (
+        item_id,
+        status,
+        company_id,
+        company_name,
+        note,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(item_id) DO UPDATE SET
+        status = excluded.status,
+        company_id = excluded.company_id,
+        company_name = excluded.company_name,
+        note = excluded.note,
+        updated_at = excluded.updated_at
+    `
+  ).run(
+    action.itemId,
+    action.status,
+    action.companyId,
+    action.companyName,
+    action.note,
+    now,
+    action.updatedAt
+  );
+
+  return readLeadAction(db, action.itemId);
 }
 
 export function hasDocument(db, key) {

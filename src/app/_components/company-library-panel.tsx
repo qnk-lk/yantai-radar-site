@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FollowUpRecord, FollowUpStage } from "./follow-up-types";
-import type { SalesIntelItem } from "./sales-intel-types";
+import type { CompanyDuplicateGroup, SalesIntelItem } from "./sales-intel-types";
 
 type CompanyJob = NonNullable<SalesIntelItem["allJobs"]>[number];
 type CompanyStageFilter = FollowUpStage | "all";
@@ -388,6 +388,68 @@ function CompanyMetricCard({
           {icon}
         </span>
       </div>
+    </Card>
+  );
+}
+
+function DuplicateCandidatePanel({
+  groups,
+  onSelectCompany,
+}: {
+  groups: CompanyDuplicateGroup[];
+  onSelectCompany: (companyId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const visibleGroups = groups.slice(0, 4);
+
+  return (
+    <Card
+      size="small"
+      title={
+        <Space size={8}>
+          <ClusterOutlined />
+          <span>{t("companies.duplicates.title")}</span>
+        </Space>
+      }
+      extra={<Tag color={groups.length ? "orange" : "default"}>{groups.length}</Tag>}
+    >
+      {visibleGroups.length ? (
+        <div className="grid gap-3">
+          {visibleGroups.map((group) => (
+            <div
+              key={group.id}
+              className="rounded-[1.1rem] border border-(--color-line) bg-(--color-card-soft) px-3 py-3"
+            >
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <Typography.Text strong>{group.canonicalName}</Typography.Text>
+                <Tag color="gold">
+                  {t("companies.duplicates.confidence", { value: group.confidence })}
+                </Tag>
+              </div>
+              <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                {group.reasons.slice(0, 2).join("；")}
+              </Typography.Paragraph>
+              <Space wrap size={[8, 8]}>
+                {group.companies.map((company) => (
+                  <button
+                    key={company.companyId}
+                    type="button"
+                    onClick={() => onSelectCompany(company.companyId)}
+                    className="cursor-pointer rounded-full border border-(--color-line) bg-white/75 px-3 py-1 text-sm text-(--color-ink) transition hover:border-(--color-accent) hover:text-(--color-accent)"
+                  >
+                    {company.companyName}
+                    {company.city ? ` · ${company.city}` : ""}
+                  </button>
+                ))}
+              </Space>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          {t("companies.duplicates.empty")}
+        </Typography.Paragraph>
+      )}
     </Card>
   );
 }
@@ -947,10 +1009,12 @@ export function CompanyLibraryPanel({
   entries,
   records,
   profiles,
+  duplicateGroups,
 }: {
   entries: CompanyLibraryEntry[];
   records: FollowUpRecord[];
   profiles: CompanyProfileRecord[];
+  duplicateGroups: CompanyDuplicateGroup[];
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -986,10 +1050,12 @@ export function CompanyLibraryPanel({
       }
     }
 
-    return [...demandSet].sort((left, right) => left.localeCompare(right)).map((tag) => ({
-      value: tag,
-      label: tag,
-    }));
+    return [...demandSet]
+      .sort((left, right) => left.localeCompare(right))
+      .map((tag) => ({
+        value: tag,
+        label: tag,
+      }));
   }, [entries]);
 
   useEffect(() => {
@@ -1129,6 +1195,14 @@ export function CompanyLibraryPanel({
               icon={<ProfileOutlined />}
             />
           </div>
+
+          <DuplicateCandidatePanel
+            groups={duplicateGroups}
+            onSelectCompany={(companyId) => {
+              setQuery("");
+              setSelectedId(companyId);
+            }}
+          />
 
           {filteredEntries.length ? (
             <div className="grid max-h-[58rem] gap-3 overflow-y-auto pr-2">

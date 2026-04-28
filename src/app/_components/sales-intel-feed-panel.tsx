@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SalesIntelDetailModal } from "./sales-intel-detail-modal";
-import type { SalesIntelData, SalesIntelItem } from "./sales-intel-types";
+import type {
+  LeadActionRecord,
+  LeadActionStatus,
+  SalesIntelData,
+  SalesIntelItem,
+} from "./sales-intel-types";
 
 function sanitizeDisplayNote(value: string) {
   return value
@@ -18,6 +23,40 @@ function sanitizeDisplayNote(value: string) {
 
 function formatDisplayUpdatedAt(value: string) {
   return value.replace(/\s*CST$/u, "");
+}
+
+function compactText(value: string) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function resolveLeadCompanyName(item: SalesIntelItem) {
+  return compactText(item.entity || item.title);
+}
+
+function resolveLeadCity(item: SalesIntelItem) {
+  return compactText(
+    item.location || item.matchedJobs?.find((job) => compactText(job.city))?.city || ""
+  );
+}
+
+function resolveLeadCompanyId(item: SalesIntelItem) {
+  const companyName = resolveLeadCompanyName(item);
+  const city = resolveLeadCity(item) || "unknown";
+  return `${companyName}::${city}`;
+}
+
+function getActionColor(status?: LeadActionStatus) {
+  if (status === "useful" || status === "company" || status === "follow_up") {
+    return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  }
+
+  if (status === "invalid") {
+    return "bg-red-50 text-red-700 border-red-200";
+  }
+
+  return "bg-white/80 text-(--color-accent) border-(--color-line)";
 }
 
 function normalizePublishedAtCandidate(value: string) {
@@ -58,12 +97,16 @@ function FeedRow({
   item,
   fallbackRetrievedAt,
   serialNumber,
+  action,
   onView,
+  onAction,
 }: {
   item: SalesIntelItem;
   fallbackRetrievedAt?: string;
   serialNumber: number;
+  action?: LeadActionRecord;
   onView: (item: SalesIntelItem) => void;
+  onAction: (item: SalesIntelItem, status: LeadActionStatus) => void;
 }) {
   const { t } = useTranslation();
   const displayPublishedAt = getDisplayPublishedAt(item);
@@ -129,19 +172,123 @@ function FeedRow({
           {t("sales_intel.view")}
         </button>
       </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-(--color-line) pt-4">
+        <div className="flex flex-wrap gap-2">
+          {action?.status ? (
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getActionColor(action.status)}`}>
+              {t(`sales_intel.actions.statuses.${action.status}`)}
+            </span>
+          ) : (
+            <span className="rounded-full border border-(--color-line) bg-white/70 px-3 py-1 text-xs font-semibold text-(--color-muted)">
+              {t("sales_intel.actions.unhandled")}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(["useful", "invalid", "company", "follow_up"] as LeadActionStatus[]).map((status) => (
+            <button
+              key={`${item.id}-${status}`}
+              type="button"
+              onClick={() => onAction(item, status)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:bg-white ${getActionColor(
+                action?.status === status ? status : undefined
+              )}`}
+            >
+              {t(`sales_intel.actions.${status}`)}
+            </button>
+          ))}
+        </div>
+      </div>
     </article>
   );
 }
 
-export function SalesIntelFeedPanel({ data }: { data: SalesIntelData }) {
+async function requestJson<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+export function SalesIntelFeedPanel({
+  data,
+  leadActions,
+  onSaveLeadAction,
+}: {
+  data: SalesIntelData;
+  leadActions: LeadActionRecord[];
+  onSaveLeadAction: (record: LeadActionRecord) => void;
+}) {
   const { t } = useTranslation();
   const [activeItem, setActiveItem] = useState<SalesIntelItem | null>(null);
+  const [pendingActionId, setPendingActionId] = useState("");
   const [isPointerInside, setIsPointerInside] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const loopBoundaryRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionRef = useRef(0);
   const feedItems = data.feed;
+  const actionMap = new Map(leadActions.map((action) => [action.itemId, action]));
   const displayNote = sanitizeDisplayNote(data.summary.note || "");
+
+  async function handleLeadAction(item: SalesIntelItem, status: LeadActionStatus) {
+    const companyName = resolveLeadCompanyName(item);
+    const city = resolveLeadCity(item);
+    const companyId = resolveLeadCompanyId(item);
+
+    setPendingActionId(`${item.id}:${status}`);
+    try {
+      if (status === "follow_up") {
+        await requestJson(`/api/follow-ups/${encodeURIComponent(companyId)}`, {
+          companyName,
+          city,
+          stage: item.strength === "高" ? "priority" : "watch",
+          contactResult: "not_contacted",
+          nextAction: item.actionText || item.summary,
+          dealStage: "lead",
+          nextReminderAt: "",
+          reminderStatus: "open",
+          completedAt: "",
+          note: item.summary,
+          lastFollowedAt: "",
+        });
+      }
+
+      if (status === "company") {
+        await requestJson(`/api/company-profiles/${encodeURIComponent(companyId)}`, {
+          companyName,
+          city,
+          industry: item.category,
+          status: t("sales_intel.actions.company_profile_status"),
+          tags: item.tags,
+          note: item.summary,
+        });
+      }
+
+      const payload = await requestJson<{ item: LeadActionRecord }>(
+        `/api/lead-actions/${encodeURIComponent(item.id)}`,
+        {
+          status,
+          companyId,
+          companyName,
+          note: item.summary,
+        }
+      );
+
+      onSaveLeadAction(payload.item);
+    } finally {
+      setPendingActionId("");
+    }
+  }
 
   const scrollingItems =
     feedItems.length > 1
@@ -253,7 +400,13 @@ export function SalesIntelFeedPanel({ data }: { data: SalesIntelData }) {
                     item={item}
                     fallbackRetrievedAt={data.updatedAt}
                     serialNumber={index + 1}
+                    action={actionMap.get(item.id)}
                     onView={setActiveItem}
+                    onAction={(targetItem, status) => {
+                      if (!pendingActionId) {
+                        void handleLeadAction(targetItem, status);
+                      }
+                    }}
                   />
                 </div>
               ))}
