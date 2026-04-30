@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Button, Select, Tag } from "antd";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SalesIntelDetailModal } from "./sales-intel-detail-modal";
@@ -41,6 +42,40 @@ function resolveLeadCity(item: SalesIntelItem) {
   return compactText(
     item.location || item.matchedJobs?.find((job) => compactText(job.city))?.city || ""
   );
+}
+
+function getLeadPlatformValues(item: SalesIntelItem) {
+  return [
+    compactText(item.sourceLabel),
+    ...(item.matchedJobs ?? []).map((job) => compactText(job.platform)),
+    ...(item.allJobs ?? []).map((job) => compactText(job.platform)),
+  ].filter(Boolean);
+}
+
+function getLeadCityValues(item: SalesIntelItem) {
+  return [
+    compactText(item.location),
+    ...(item.matchedJobs ?? []).map((job) => compactText(job.city)),
+    ...(item.allJobs ?? []).map((job) => compactText(job.city)),
+  ].filter(Boolean);
+}
+
+function getLeadSearchValues(item: SalesIntelItem) {
+  return [
+    ...item.tags,
+    item.category,
+    item.title,
+    item.subtitle,
+    item.summary,
+    item.actionText,
+    ...(item.matchedJobs ?? []).flatMap((job) => [
+      job.jobTitle,
+      job.descriptionEvidence,
+      ...(job.keywordHits ?? []),
+    ]),
+  ]
+    .map(compactText)
+    .filter(Boolean);
 }
 
 function resolveLeadCompanyId(item: SalesIntelItem) {
@@ -90,6 +125,74 @@ function getDisplayPublishedAt(item: SalesIntelItem) {
 function getDisplayRetrievedAt(retrievedAt?: string | null, fallbackRetrievedAt?: string | null) {
   const value = retrievedAt || fallbackRetrievedAt || "";
   return value ? formatDisplayUpdatedAt(value) : "";
+}
+
+type LeadActionFilter = "all" | "unhandled" | "handled" | LeadActionStatus;
+
+type LeadFilters = {
+  platforms: string[];
+  cities: string[];
+  strengths: string[];
+  searchItems: string[];
+  action: LeadActionFilter;
+};
+
+const defaultLeadFilters: LeadFilters = {
+  platforms: [],
+  cities: [],
+  strengths: [],
+  searchItems: [],
+  action: "all",
+};
+
+function createSelectOptions(values: string[]) {
+  return [...new Set(values.map(compactText).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, "zh-Hans-CN"))
+    .map((value) => ({ value, label: value }));
+}
+
+function hasAnySelectedValue(values: string[], selectedValues: string[]) {
+  if (!selectedValues.length) {
+    return true;
+  }
+
+  const normalizedValues = new Set(values.map((value) => compactText(value).toLowerCase()));
+  return selectedValues.some((value) => normalizedValues.has(compactText(value).toLowerCase()));
+}
+
+function doesSearchItemMatch(item: SalesIntelItem, searchItems: string[]) {
+  if (!searchItems.length) {
+    return true;
+  }
+
+  const text = getLeadSearchValues(item).join(" ").toLowerCase();
+  return searchItems.some((value) => text.includes(compactText(value).toLowerCase()));
+}
+
+function doesActionMatch(action: LeadActionRecord | undefined, filter: LeadActionFilter) {
+  if (filter === "all") {
+    return true;
+  }
+
+  if (filter === "unhandled") {
+    return !action?.status;
+  }
+
+  if (filter === "handled") {
+    return Boolean(action?.status);
+  }
+
+  return action?.status === filter;
+}
+
+function areFiltersEmpty(filters: LeadFilters) {
+  return (
+    !filters.platforms.length &&
+    !filters.cities.length &&
+    !filters.strengths.length &&
+    !filters.searchItems.length &&
+    filters.action === "all"
+  );
 }
 
 function FeedRow({
@@ -238,11 +341,43 @@ export function SalesIntelFeedPanel({
   const [activeItem, setActiveItem] = useState<SalesIntelItem | null>(null);
   const [pendingActionId, setPendingActionId] = useState("");
   const [isPointerInside, setIsPointerInside] = useState(false);
+  const [filters, setFilters] = useState<LeadFilters>(defaultLeadFilters);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const loopBoundaryRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionRef = useRef(0);
   const feedItems = data.feed;
-  const actionMap = new Map(leadActions.map((action) => [action.itemId, action]));
+  const actionMap = useMemo(
+    () => new Map(leadActions.map((action) => [action.itemId, action])),
+    [leadActions]
+  );
+  const filterOptions = useMemo(
+    () => ({
+      platforms: createSelectOptions(feedItems.flatMap(getLeadPlatformValues)),
+      cities: createSelectOptions(feedItems.flatMap(getLeadCityValues)),
+      strengths: createSelectOptions(feedItems.map((item) => item.strength)),
+      searchItems: createSelectOptions([
+        ...(data.todaySearchItems ?? []),
+        ...feedItems.flatMap((item) => item.tags),
+      ]),
+    }),
+    [data.todaySearchItems, feedItems]
+  );
+  const filteredItems = useMemo(
+    () =>
+      feedItems.filter((item) => {
+        const action = actionMap.get(item.id);
+
+        return (
+          hasAnySelectedValue(getLeadPlatformValues(item), filters.platforms) &&
+          hasAnySelectedValue(getLeadCityValues(item), filters.cities) &&
+          hasAnySelectedValue([item.strength], filters.strengths) &&
+          doesSearchItemMatch(item, filters.searchItems) &&
+          doesActionMatch(action, filters.action)
+        );
+      }),
+    [actionMap, feedItems, filters]
+  );
+  const hasActiveFilters = !areFiltersEmpty(filters);
   const displayNote = sanitizeDisplayNote(data.summary.note || "");
 
   async function handleLeadAction(item: SalesIntelItem, status: LeadActionStatus) {
@@ -310,17 +445,17 @@ export function SalesIntelFeedPanel({
   }
 
   const scrollingItems =
-    feedItems.length > 1
+    filteredItems.length > 1
       ? [
-          ...feedItems.map((item, index) => ({ item, loop: 0, index })),
-          ...feedItems.map((item, index) => ({ item, loop: 1, index })),
+          ...filteredItems.map((item, index) => ({ item, loop: 0, index })),
+          ...filteredItems.map((item, index) => ({ item, loop: 1, index })),
         ]
-      : feedItems.map((item, index) => ({ item, loop: 0, index }));
+      : filteredItems.map((item, index) => ({ item, loop: 0, index }));
 
   useEffect(() => {
     const container = containerRef.current;
 
-    if (!container || feedItems.length <= 1) {
+    if (!container || filteredItems.length <= 1) {
       return;
     }
 
@@ -360,7 +495,15 @@ export function SalesIntelFeedPanel({
     return () => {
       window.cancelAnimationFrame(animationFrameId);
     };
-  }, [activeItem, feedItems.length, isPointerInside]);
+  }, [activeItem, filteredItems.length, isPointerInside]);
+
+  useEffect(() => {
+    scrollPositionRef.current = 0;
+
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  }, [filters]);
 
   return (
     <>
@@ -394,12 +537,90 @@ export function SalesIntelFeedPanel({
               {t("sales_intel.total_label")}
             </p>
             <p className="text-3xl font-semibold leading-none text-(--color-ink)">
-              {data.totals.overall}
+              {hasActiveFilters ? `${filteredItems.length}/${data.totals.overall}` : data.totals.overall}
             </p>
           </div>
         </div>
 
         {feedItems.length ? (
+          <div className="rounded-[1.5rem] border border-(--color-line) bg-(--color-card-soft) p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-(--color-ink)">
+                  {t("sales_intel.filters.title")}
+                </span>
+                <Tag color={hasActiveFilters ? "orange" : "default"}>
+                  {t("sales_intel.filters.result", {
+                    count: filteredItems.length,
+                    total: feedItems.length,
+                  })}
+                </Tag>
+              </div>
+              <Button
+                size="small"
+                disabled={!hasActiveFilters}
+                onClick={() => setFilters(defaultLeadFilters)}
+              >
+                {t("sales_intel.filters.reset")}
+              </Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <Select
+                mode="multiple"
+                allowClear
+                maxTagCount="responsive"
+                placeholder={t("sales_intel.filters.platform")}
+                value={filters.platforms}
+                options={filterOptions.platforms}
+                onChange={(value) => setFilters((current) => ({ ...current, platforms: value }))}
+              />
+              <Select
+                mode="multiple"
+                allowClear
+                maxTagCount="responsive"
+                placeholder={t("sales_intel.filters.city")}
+                value={filters.cities}
+                options={filterOptions.cities}
+                onChange={(value) => setFilters((current) => ({ ...current, cities: value }))}
+              />
+              <Select
+                mode="multiple"
+                allowClear
+                maxTagCount="responsive"
+                placeholder={t("sales_intel.filters.strength")}
+                value={filters.strengths}
+                options={filterOptions.strengths}
+                onChange={(value) => setFilters((current) => ({ ...current, strengths: value }))}
+              />
+              <Select
+                mode="multiple"
+                allowClear
+                maxTagCount="responsive"
+                placeholder={t("sales_intel.filters.search_item")}
+                value={filters.searchItems}
+                options={filterOptions.searchItems}
+                onChange={(value) => setFilters((current) => ({ ...current, searchItems: value }))}
+              />
+              <Select
+                value={filters.action}
+                options={[
+                  { value: "all", label: t("sales_intel.filters.action_all") },
+                  { value: "unhandled", label: t("sales_intel.filters.action_unhandled") },
+                  { value: "handled", label: t("sales_intel.filters.action_handled") },
+                  { value: "follow_up", label: t("sales_intel.actions.statuses.follow_up") },
+                  { value: "company", label: t("sales_intel.actions.statuses.company") },
+                  { value: "useful", label: t("sales_intel.actions.statuses.useful") },
+                  { value: "invalid", label: t("sales_intel.actions.statuses.invalid") },
+                ]}
+                onChange={(value) =>
+                  setFilters((current) => ({ ...current, action: value as LeadActionFilter }))
+                }
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {filteredItems.length ? (
           <div
             ref={containerRef}
             onScroll={(event) => {
@@ -433,7 +654,7 @@ export function SalesIntelFeedPanel({
           </div>
         ) : (
           <div className="rounded-[1.5rem] border border-dashed border-(--color-line) bg-(--color-card-soft) px-5 py-10 text-center text-sm leading-7 text-(--color-muted)">
-            {t("sales_intel.empty_feed")}
+            {feedItems.length ? t("sales_intel.filters.empty") : t("sales_intel.empty_feed")}
           </div>
         )}
       </section>

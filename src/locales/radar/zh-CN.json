@@ -168,6 +168,19 @@
       "report": "日报 {{count}} 条 · {{updatedAt}}",
       "recruitment": "招聘 {{count}} 条 · {{updatedAt}}"
     },
+    "filters": {
+      "title": "线索筛选",
+      "platform": "按平台筛选",
+      "city": "按城市筛选",
+      "strength": "按强度筛选",
+      "search_item": "按检索项筛选",
+      "action_all": "全部处理状态",
+      "action_unhandled": "未处理",
+      "action_handled": "已处理",
+      "reset": "重置筛选",
+      "result": "当前 {{count}} / {{total}} 条",
+      "empty": "当前筛选条件下暂无线索。"
+    },
     "empty_feed": "当前还没有写入统一销售信息总表，等待日报和招聘聚合结果同步。",
     "empty_today": "当前还没有同步到今日十条招聘重点信息。"
   },
