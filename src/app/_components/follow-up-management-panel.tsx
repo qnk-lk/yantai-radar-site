@@ -926,6 +926,142 @@ function StageColumn({
   );
 }
 
+function FollowUpOwnerInsightPanel({
+  entries,
+  onSelectOwner,
+}: {
+  entries: FollowUpBoardEntry[];
+  onSelectOwner: (owner: string) => void;
+}) {
+  const { t } = useTranslation();
+  const ownerItems = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        owner: string;
+        total: number;
+        overdue: number;
+        today: number;
+        completed: number;
+        priority: number;
+      }
+    >();
+
+    for (const entry of entries) {
+      const owner = entry.followUpRecord?.owner || t("follow_ups.values.unassigned_owner");
+      const current = map.get(owner) ?? {
+        owner,
+        total: 0,
+        overdue: 0,
+        today: 0,
+        completed: 0,
+        priority: 0,
+      };
+      const reminderState = getReminderState(entry.followUpRecord);
+
+      current.total += 1;
+      current.priority += entry.stage === "priority" ? 1 : 0;
+      current.overdue += reminderState === "overdue" ? 1 : 0;
+      current.today += reminderState === "today" ? 1 : 0;
+      current.completed += reminderState === "completed" ? 1 : 0;
+      map.set(owner, current);
+    }
+
+    return [...map.values()].sort(
+      (left, right) =>
+        right.overdue - left.overdue ||
+        right.today - left.today ||
+        right.priority - left.priority ||
+        right.total - left.total
+    );
+  }, [entries, t]);
+
+  return (
+    <Card title={t("follow_ups.owner_insight.title")}>
+      <Typography.Paragraph type="secondary">
+        {t("follow_ups.owner_insight.description")}
+      </Typography.Paragraph>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {ownerItems.map((item) => (
+          <button
+            key={item.owner}
+            type="button"
+            className="cursor-pointer rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(69,49,28,0.12)]"
+            onClick={() =>
+              onSelectOwner(
+                item.owner === t("follow_ups.values.unassigned_owner") ? "__unassigned" : item.owner
+              )
+            }
+          >
+            <div className="flex items-start justify-between gap-3">
+              <Typography.Text strong>{item.owner}</Typography.Text>
+              <Tag>{t("follow_ups.owner_insight.total", { count: item.total })}</Tag>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Tag color={item.overdue ? "red" : undefined}>
+                {t("follow_ups.owner_insight.overdue", { count: item.overdue })}
+              </Tag>
+              <Tag color={item.today ? "orange" : undefined}>
+                {t("follow_ups.owner_insight.today", { count: item.today })}
+              </Tag>
+              <Tag color={item.priority ? "gold" : undefined}>
+                {t("follow_ups.owner_insight.priority", { count: item.priority })}
+              </Tag>
+              <Tag color="green">
+                {t("follow_ups.owner_insight.completed", { count: item.completed })}
+              </Tag>
+            </div>
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function FollowUpActionInsightPanel({ entries }: { entries: FollowUpBoardEntry[] }) {
+  const { t } = useTranslation();
+  const actionItems = useMemo(() => {
+    const map = new Map<string, { action: string; count: number; companies: string[] }>();
+
+    for (const entry of entries) {
+      const action = compactText(entry.followUpRecord?.nextAction || entry.suggestedAction);
+      const current = map.get(action) ?? { action, count: 0, companies: [] };
+
+      current.count += 1;
+      current.companies.push(entry.companyName);
+      map.set(action, current);
+    }
+
+    return [...map.values()].sort((left, right) => right.count - left.count).slice(0, 6);
+  }, [entries]);
+
+  return (
+    <Card title={t("follow_ups.action_insight.title")}>
+      <Typography.Paragraph type="secondary">
+        {t("follow_ups.action_insight.description")}
+      </Typography.Paragraph>
+      <div className="grid gap-3">
+        {actionItems.map((item) => (
+          <div
+            key={item.action}
+            className="rounded-[1.2rem] border border-(--color-line) bg-white/60 p-4"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
+                {item.action}
+              </Typography.Paragraph>
+              <Tag>{t("follow_ups.action_insight.count", { count: item.count })}</Tag>
+            </div>
+            <Typography.Text type="secondary" className="mt-2 block">
+              {item.companies.slice(0, 4).join("、")}
+            </Typography.Text>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export function FollowUpManagementPanel({
   entries,
   records,
@@ -1178,6 +1314,14 @@ export function FollowUpManagementPanel({
         entries={boardEntries}
         onSelectState={(state) => updateFilter({ reminderState: state })}
       />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <FollowUpOwnerInsightPanel
+          entries={boardEntries}
+          onSelectOwner={(owner) => updateFilter({ owner })}
+        />
+        <FollowUpActionInsightPanel entries={boardEntries} />
+      </div>
 
       <Card>
         <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">

@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { pathToFileURL } from "node:url";
 
 import { buildCompanyDuplicateCandidates } from "./lib/company-dedupe.mjs";
 
@@ -318,6 +319,221 @@ function getSalesIntelItemDateKey(item) {
   return getShanghaiDateKey(item?.retrievedAt || normalizeSalesIntelPublishedAt(item));
 }
 
+function compactServerText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getSalesIntelEntity(item) {
+  return compactServerText(item?.entity || item?.title || item?.subtitle);
+}
+
+function getSalesIntelCity(item) {
+  const candidateValues = [
+    item?.location,
+    ...(Array.isArray(item?.matchedJobs) ? item.matchedJobs.map((job) => job?.city) : []),
+    ...(Array.isArray(item?.allJobs) ? item.allJobs.map((job) => job?.city) : []),
+  ];
+
+  return candidateValues.map(compactServerText).find(Boolean) ?? "";
+}
+
+function getSalesIntelPlatforms(item) {
+  return [
+    item?.sourceLabel,
+    ...(Array.isArray(item?.matchedJobs) ? item.matchedJobs.map((job) => job?.platform) : []),
+    ...(Array.isArray(item?.allJobs) ? item.allJobs.map((job) => job?.platform) : []),
+  ]
+    .map(compactServerText)
+    .filter(Boolean);
+}
+
+function getSalesIntelEvidenceCount(item) {
+  return Array.isArray(item?.evidence)
+    ? item.evidence.filter((evidence) => compactServerText(evidence?.url || evidence?.source))
+        .length
+    : 0;
+}
+
+function incrementCounter(map, key, amount = 1) {
+  const safeKey = compactServerText(key);
+
+  if (!safeKey) {
+    return;
+  }
+
+  map.set(safeKey, (map.get(safeKey) ?? 0) + amount);
+}
+
+function mapCounterToItems(map, limit = 8) {
+  return [...map.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort(
+      (left, right) => right.count - left.count || left.label.localeCompare(right.label, "zh-CN")
+    )
+    .slice(0, limit);
+}
+
+function getFollowUpReminderState(record) {
+  if (record?.reminderStatus === "completed") {
+    return "completed";
+  }
+
+  const dateKey = getShanghaiDateKey(record?.nextReminderAt);
+  if (!dateKey) {
+    return "unset";
+  }
+
+  const todayKey = getTodayShanghaiDateKey();
+  if (dateKey < todayKey) {
+    return "overdue";
+  }
+
+  if (dateKey === todayKey) {
+    return "today";
+  }
+
+  return "future";
+}
+
+function buildFollowUpStats(followUpRecords) {
+  const ownerMap = new Map();
+  const nextActionMap = new Map();
+  const dealStageMap = new Map();
+  const reminderCounts = {
+    today: 0,
+    overdue: 0,
+    completed: 0,
+    unset: 0,
+    future: 0,
+  };
+
+  for (const record of followUpRecords) {
+    reminderCounts[getFollowUpReminderState(record)] += 1;
+    incrementCounter(ownerMap, record?.owner || "未分配");
+    incrementCounter(nextActionMap, record?.nextAction || "未填写下一步");
+    incrementCounter(dealStageMap, record?.dealStage || "未设置阶段");
+  }
+
+  return {
+    total: followUpRecords.length,
+    assigned: followUpRecords.filter((record) => compactServerText(record?.owner)).length,
+    unassigned: followUpRecords.filter((record) => !compactServerText(record?.owner)).length,
+    open: followUpRecords.filter((record) => record?.reminderStatus !== "completed").length,
+    ...reminderCounts,
+    owners: mapCounterToItems(ownerMap, 12),
+    nextActions: mapCounterToItems(nextActionMap, 8),
+    dealStages: mapCounterToItems(dealStageMap, 8),
+  };
+}
+
+function buildQualityStats(payload, leadActions, duplicateDecisions) {
+  const items = Array.isArray(payload?.feed) ? payload.feed : [];
+  const duplicateGroups = buildCompanyDuplicateCandidates(items);
+  const resolvedDuplicateKeys = new Set(
+    duplicateDecisions.map((decision) => decision.duplicateKey).filter(Boolean)
+  );
+  const pendingDuplicateGroups = duplicateGroups.filter(
+    (group) => !resolvedDuplicateKeys.has(group.duplicateKey)
+  );
+  const actionItemIds = new Set(leadActions.map((action) => action.itemId).filter(Boolean));
+  const missingPublishedAt = items.filter((item) => !normalizeSalesIntelPublishedAt(item)).length;
+  const missingCity = items.filter((item) => !getSalesIntelCity(item)).length;
+  const missingSource = items.filter((item) => !getSalesIntelPlatforms(item).length).length;
+  const lowEvidence = items.filter((item) => getSalesIntelEvidenceCount(item) === 0).length;
+  const untouched = items.filter((item) => !actionItemIds.has(item?.id)).length;
+
+  return {
+    totalItems: items.length,
+    pendingDuplicateGroups: pendingDuplicateGroups.length,
+    pendingDuplicateCompanies: pendingDuplicateGroups.reduce(
+      (total, group) => total + group.companies.length,
+      0
+    ),
+    missingPublishedAt,
+    missingCity,
+    missingSource,
+    lowEvidence,
+    untouched,
+    resolvedDuplicateDecisions: duplicateDecisions.length,
+    issueTotal:
+      pendingDuplicateGroups.length +
+      missingPublishedAt +
+      missingCity +
+      missingSource +
+      lowEvidence,
+  };
+}
+
+function buildReportStats(payload, leadActions, followUpRecords, companyProfiles) {
+  const items = Array.isArray(payload?.feed) ? payload.feed : [];
+  const trend7 = buildSalesTrend(payload);
+  const trend30 = createTrendDateRange(items, payload?.updatedAt, 30);
+  const trend30Map = new Map(trend30.map((item) => [item.date, item]));
+  const platformMap = new Map();
+  const companySet = new Set();
+
+  for (const item of items) {
+    const dateKey = getSalesIntelItemDateKey(item);
+    const bucket = trend30Map.get(dateKey);
+
+    if (bucket) {
+      bucket.total += 1;
+      if (item?.kind === "report") {
+        bucket.report += 1;
+      }
+      if (item?.kind === "recruitment") {
+        bucket.recruitment += 1;
+      }
+      if (isHighStrength(item?.strength)) {
+        bucket.highStrength += 1;
+      }
+    }
+
+    const entity = getSalesIntelEntity(item);
+    if (entity) {
+      companySet.add(entity);
+    }
+
+    for (const platform of getSalesIntelPlatforms(item)) {
+      incrementCounter(platformMap, platform);
+    }
+  }
+
+  const actionCompanyIds = new Set(
+    leadActions
+      .filter((action) => action.status === "follow_up" || action.status === "company")
+      .map((action) => action.companyId)
+      .filter(Boolean)
+  );
+  const closedFollowUps = followUpRecords.filter(
+    (record) => record.reminderStatus === "completed"
+  ).length;
+
+  return {
+    trend7,
+    trend30,
+    platformContribution: mapCounterToItems(platformMap, 10),
+    totals: {
+      signals: items.length,
+      uniqueCompanies: companySet.size,
+      companyProfiles: companyProfiles.length,
+      actionCompanies: actionCompanyIds.size,
+      followUps: followUpRecords.length,
+      closedFollowUps,
+    },
+    conversion: {
+      signalToActionRate: items.length
+        ? Math.round((actionCompanyIds.size / items.length) * 100)
+        : 0,
+      followUpCloseRate: followUpRecords.length
+        ? Math.round((closedFollowUps / followUpRecords.length) * 100)
+        : 0,
+    },
+  };
+}
+
 function createTrendDateRange(items, updatedAt, days = 7) {
   const parsedTimes = items
     .map((item) => {
@@ -353,7 +569,11 @@ function createTrendDateRange(items, updatedAt, days = 7) {
 }
 
 function isHighStrength(value) {
-  return ["高", "high", "strong"].includes(String(value || "").trim().toLowerCase());
+  return ["高", "high", "strong"].includes(
+    String(value || "")
+      .trim()
+      .toLowerCase()
+  );
 }
 
 function buildSalesTrend(payload) {
@@ -407,7 +627,7 @@ function getFreshnessStatus(updatedAt, maxAgeHours = 30) {
   return "normal";
 }
 
-function buildOverviewStatsPayload(db) {
+export function buildOverviewStatsPayload(db) {
   const salesDocument = readDocument(db, "salesIntel");
   const recruitmentDocument = readDocument(db, "recruitmentLeads");
   const competitorDocument = readDocument(db, "competitors");
@@ -418,6 +638,7 @@ function buildOverviewStatsPayload(db) {
   const leadActions = readLeadActions(db);
   const followUpRecords = readFollowUpRecords(db);
   const companyProfiles = readCompanyProfiles(db);
+  const duplicateDecisions = readCompanyDuplicateDecisions(db);
   const actionCompanyIds = new Set(
     leadActions
       .filter((item) => item.status === "follow_up" || item.status === "company")
@@ -449,7 +670,9 @@ function buildOverviewStatsPayload(db) {
       key: "competitor",
       label: "同行链路",
       updatedAt: competitorPayload?.updatedAt ?? competitorDocument?.updatedAt ?? "",
-      count: Array.isArray(competitorPayload?.competitors) ? competitorPayload.competitors.length : 0,
+      count: Array.isArray(competitorPayload?.competitors)
+        ? competitorPayload.competitors.length
+        : 0,
     },
     {
       key: "followUp",
@@ -488,6 +711,9 @@ function buildOverviewStatsPayload(db) {
       totalCount: sourceItems.length,
       items: sourceItems,
     },
+    quality: buildQualityStats(salesPayload, leadActions, duplicateDecisions),
+    followUps: buildFollowUpStats(followUpRecords),
+    reports: buildReportStats(salesPayload, leadActions, followUpRecords, companyProfiles),
   };
 }
 
@@ -874,21 +1100,26 @@ function buildApp(config, db) {
   return app;
 }
 
-const cliOptions = parseCliArgs(process.argv.slice(2));
-const config = {
-  ...resolveConfig(),
-  ...(cliOptions.host ? { host: cliOptions.host } : {}),
-  ...(Number.isFinite(cliOptions.port) ? { port: cliOptions.port } : {}),
-};
-const database = await initializeStore(config);
-const app = buildApp(config, database);
+const isDirectExecution =
+  process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 
-try {
-  await app.listen({
-    host: config.host,
-    port: config.port,
-  });
-} catch (error) {
-  app.log.error(error);
-  process.exit(1);
+if (isDirectExecution) {
+  const cliOptions = parseCliArgs(process.argv.slice(2));
+  const config = {
+    ...resolveConfig(),
+    ...(cliOptions.host ? { host: cliOptions.host } : {}),
+    ...(Number.isFinite(cliOptions.port) ? { port: cliOptions.port } : {}),
+  };
+  const database = await initializeStore(config);
+  const app = buildApp(config, database);
+
+  try {
+    await app.listen({
+      host: config.host,
+      port: config.port,
+    });
+  } catch (error) {
+    app.log.error(error);
+    process.exit(1);
+  }
 }

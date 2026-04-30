@@ -7,6 +7,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   DatabaseOutlined,
+  FileSearchOutlined,
   RadarChartOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
@@ -146,6 +147,63 @@ type OverviewStatsPayload = {
       count: number;
       status: "normal" | "stale" | "missing";
     }>;
+  };
+  quality?: {
+    totalItems: number;
+    pendingDuplicateGroups: number;
+    pendingDuplicateCompanies: number;
+    missingPublishedAt: number;
+    missingCity: number;
+    missingSource: number;
+    lowEvidence: number;
+    untouched: number;
+    resolvedDuplicateDecisions: number;
+    issueTotal: number;
+  };
+  followUps?: {
+    total: number;
+    assigned: number;
+    unassigned: number;
+    open: number;
+    today: number;
+    overdue: number;
+    completed: number;
+    unset: number;
+    future: number;
+    owners: Array<{ label: string; count: number }>;
+    nextActions: Array<{ label: string; count: number }>;
+    dealStages: Array<{ label: string; count: number }>;
+  };
+  reports?: {
+    trend7: Array<{
+      date: string;
+      label: string;
+      total: number;
+      report: number;
+      recruitment: number;
+      highStrength: number;
+    }>;
+    trend30: Array<{
+      date: string;
+      label: string;
+      total: number;
+      report: number;
+      recruitment: number;
+      highStrength: number;
+    }>;
+    platformContribution: Array<{ label: string; count: number }>;
+    totals: {
+      signals: number;
+      uniqueCompanies: number;
+      companyProfiles: number;
+      actionCompanies: number;
+      followUps: number;
+      closedFollowUps: number;
+    };
+    conversion: {
+      signalToActionRate: number;
+      followUpCloseRate: number;
+    };
   };
 };
 
@@ -889,13 +947,111 @@ function OverviewTrendPanel({
               title={`${item.label}: ${item.total}`}
             />
             <div className="text-center">
-              <Typography.Text className="block text-sm font-semibold">{item.total}</Typography.Text>
+              <Typography.Text className="block text-sm font-semibold">
+                {item.total}
+              </Typography.Text>
               <Typography.Text type="secondary" className="block text-xs">
                 {item.label}
               </Typography.Text>
             </div>
           </div>
         ))}
+      </div>
+    </Card>
+  );
+}
+
+function CompactBarList({
+  items,
+  emptyText,
+}: {
+  items: Array<{ label: string; count: number }>;
+  emptyText: string;
+}) {
+  const maxCount = Math.max(...items.map((item) => item.count), 1);
+
+  if (!items.length) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} />;
+  }
+
+  return (
+    <div className="grid gap-3">
+      {items.map((item) => (
+        <div key={item.label} className="grid gap-1">
+          <div className="flex items-center justify-between gap-3">
+            <Typography.Text className="min-w-0 truncate">{item.label}</Typography.Text>
+            <Tag>{item.count}</Tag>
+          </div>
+          <Progress
+            percent={Math.round((item.count / maxCount) * 100)}
+            showInfo={false}
+            size="small"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OverviewReportPanel({ overviewStats }: { overviewStats: OverviewStatsPayload | null }) {
+  const { t } = useTranslation();
+  const reports = overviewStats?.reports;
+  const recent7Total = reports?.trend7?.reduce((total, item) => total + item.total, 0) ?? 0;
+  const recent30Total = reports?.trend30?.reduce((total, item) => total + item.total, 0) ?? 0;
+
+  return (
+    <Card title={t("overview.reports.title")} className="h-full">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label={t("overview.reports.recent_7")}
+          value={recent7Total}
+          detail={t("overview.reports.recent_7_detail")}
+        />
+        <MetricCard
+          label={t("overview.reports.recent_30")}
+          value={recent30Total}
+          detail={t("overview.reports.recent_30_detail")}
+        />
+        <MetricCard
+          label={t("overview.reports.unique_companies")}
+          value={reports?.totals.uniqueCompanies ?? 0}
+          detail={t("overview.reports.unique_companies_detail")}
+        />
+        <MetricCard
+          label={t("overview.reports.action_rate")}
+          value={`${reports?.conversion.signalToActionRate ?? 0}%`}
+          detail={t("overview.reports.action_rate_detail")}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+        <div className="rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <FileSearchOutlined className="text-(--color-accent)" />
+            <Typography.Text strong>{t("overview.reports.platform_title")}</Typography.Text>
+          </div>
+          <CompactBarList
+            items={reports?.platformContribution ?? []}
+            emptyText={t("overview.reports.platform_empty")}
+          />
+        </div>
+        <div className="grid gap-3 rounded-[1.2rem] border border-(--color-line) bg-white/60 p-4">
+          <Typography.Text strong>{t("overview.reports.conversion_title")}</Typography.Text>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Statistic
+              title={t("overview.reports.follow_up_total")}
+              value={reports?.totals.followUps ?? 0}
+            />
+            <Statistic
+              title={t("overview.reports.close_rate")}
+              value={reports?.conversion.followUpCloseRate ?? 0}
+              suffix="%"
+            />
+          </div>
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            {t("overview.reports.description")}
+          </Typography.Paragraph>
+        </div>
       </div>
     </Card>
   );
@@ -914,10 +1070,9 @@ function OverviewOperationalPanel({
     overviewStats?.sources?.totalCount && overviewStats.sources.totalCount > 0
       ? Math.round((overviewStats.sources.normalCount / overviewStats.sources.totalCount) * 100)
       : 0;
-  const selectedPlatforms =
-    overviewStats?.platforms?.selectedPlatforms?.length
-      ? overviewStats.platforms.selectedPlatforms
-      : salesIntelData.todaySearchItems ?? [];
+  const selectedPlatforms = overviewStats?.platforms?.selectedPlatforms?.length
+    ? overviewStats.platforms.selectedPlatforms
+    : (salesIntelData.todaySearchItems ?? []);
   const coverage = overviewStats?.platforms?.coverage ?? [];
 
   function renderSourceTag(status: string) {
@@ -977,7 +1132,9 @@ function OverviewOperationalPanel({
               <div key={item.platform} className="rounded-[1rem] bg-white/55 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <Typography.Text strong>{item.platform}</Typography.Text>
-                  <Tag color={item.status === "success" || item.status === "ok" ? "green" : "default"}>
+                  <Tag
+                    color={item.status === "success" || item.status === "ok" ? "green" : "default"}
+                  >
                     {item.status || t("sources.platforms.status_waiting")}
                   </Tag>
                 </div>
@@ -1001,7 +1158,9 @@ function OverviewOperationalPanel({
                 {renderSourceTag(item.status)}
               </div>
               <Typography.Text type="secondary" className="mt-1 block">
-                {item.updatedAt ? formatDisplayUpdatedAt(item.updatedAt) : t("sales_intel.not_synced")}
+                {item.updatedAt
+                  ? formatDisplayUpdatedAt(item.updatedAt)
+                  : t("sales_intel.not_synced")}
               </Typography.Text>
             </div>
           ))}
@@ -1163,6 +1322,7 @@ function OverviewCommandCenter({
         <OverviewTrendPanel items={salesIntelData.feed} overviewStats={overviewStats} />
       </div>
 
+      <OverviewReportPanel overviewStats={overviewStats} />
       <OverviewOperationalPanel overviewStats={overviewStats} salesIntelData={salesIntelData} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.78fr)]">
@@ -1188,6 +1348,7 @@ function SourcesPanel({
   companyProfiles,
   recruitmentLeadsData,
   apiHealth,
+  overviewStats,
 }: {
   salesIntelData: SalesIntelData;
   competitorData: CompetitorData;
@@ -1195,6 +1356,7 @@ function SourcesPanel({
   companyProfiles: CompanyProfileRecord[];
   recruitmentLeadsData: RecruitmentLeadsPayload;
   apiHealth: ApiHealthPayload | null;
+  overviewStats: OverviewStatsPayload | null;
 }) {
   const { t } = useTranslation();
   const reportSource = salesIntelData.sourceBreakdown.find((item) => item.kind === "report");
@@ -1353,6 +1515,54 @@ function SourcesPanel({
 
   return (
     <div className="space-y-6">
+      <Card title={t("sources.quality.title")}>
+        <Typography.Paragraph type="secondary">
+          {t("sources.quality.description")}
+        </Typography.Paragraph>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label={t("sources.quality.pending_duplicates")}
+            value={overviewStats?.quality?.pendingDuplicateGroups ?? 0}
+            detail={t("sources.quality.pending_duplicates_detail", {
+              count: overviewStats?.quality?.pendingDuplicateCompanies ?? 0,
+            })}
+          />
+          <MetricCard
+            label={t("sources.quality.missing_published_at")}
+            value={overviewStats?.quality?.missingPublishedAt ?? 0}
+            detail={t("sources.quality.missing_published_at_detail")}
+          />
+          <MetricCard
+            label={t("sources.quality.low_evidence")}
+            value={overviewStats?.quality?.lowEvidence ?? 0}
+            detail={t("sources.quality.low_evidence_detail")}
+          />
+          <MetricCard
+            label={t("sources.quality.untouched")}
+            value={overviewStats?.quality?.untouched ?? 0}
+            detail={t("sources.quality.untouched_detail")}
+          />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Tag>
+            {t("sources.quality.missing_city", { count: overviewStats?.quality?.missingCity ?? 0 })}
+          </Tag>
+          <Tag>
+            {t("sources.quality.missing_source", {
+              count: overviewStats?.quality?.missingSource ?? 0,
+            })}
+          </Tag>
+          <Tag color="green">
+            {t("sources.quality.resolved_duplicates", {
+              count: overviewStats?.quality?.resolvedDuplicateDecisions ?? 0,
+            })}
+          </Tag>
+          <Tag color={(overviewStats?.quality?.issueTotal ?? 0) ? "gold" : "green"}>
+            {t("sources.quality.issue_total", { count: overviewStats?.quality?.issueTotal ?? 0 })}
+          </Tag>
+        </div>
+      </Card>
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.42fr)]">
         <Card title={t("sources.title")}>
           <Typography.Paragraph type="secondary">{t("sources.description")}</Typography.Paragraph>
@@ -1588,6 +1798,8 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
   useEffect(() => {
     let active = true;
     const shouldLoadOperationalStatus = view === "overview" || view === "sources";
+    const shouldLoadOverviewStats =
+      view === "overview" || view === "sources" || view === "follow-ups";
 
     async function loadData() {
       setIsInitialLoading(true);
@@ -1623,7 +1835,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         loadJsonWithFallback<CompanyDuplicatesResponsePayload>(
           createRemoteOnlyDataSources("/api/company-duplicates")
         ),
-        view === "overview"
+        shouldLoadOverviewStats
           ? loadJsonWithFallback<OverviewStatsPayload>(
               createRemoteOnlyDataSources("/api/overview/stats")
             )
@@ -2033,6 +2245,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
             companyProfiles={companyProfiles}
             recruitmentLeadsData={recruitmentLeadsData}
             apiHealth={apiHealth}
+            overviewStats={overviewStats}
           />
         );
       default:

@@ -238,6 +238,23 @@
       "title": "近 7 日新增趋势",
       "description": "由后端按检索时间或发布时间聚合最近 7 天新增线索，先用于判断每日数据是否断档。"
     },
+    "reports": {
+      "title": "经营报表首版",
+      "recent_7": "近 7 日新增",
+      "recent_7_detail": "最近一周新增到销售总表的线索数量。",
+      "recent_30": "近 30 日新增",
+      "recent_30_detail": "最近一个月沉淀的全部线索数量。",
+      "unique_companies": "有效企业",
+      "unique_companies_detail": "按企业名称去重后的公司数量。",
+      "action_rate": "动作转化率",
+      "action_rate_detail": "已转跟进或企业库的公司占总线索比例。",
+      "platform_title": "平台贡献",
+      "platform_empty": "暂无平台贡献数据。",
+      "conversion_title": "跟进转化",
+      "follow_up_total": "跟进记录",
+      "close_rate": "闭环率",
+      "description": "这组报表先用于判断增长、平台贡献和跟进闭环，后续可继续扩展周报和月报。"
+    },
     "operational": {
       "title": "今日运行摘要",
       "health": "链路健康度",
@@ -385,6 +402,20 @@
     "empty_stage": "当前阶段没有企业。",
     "future_title": "当前闭环能力",
     "future_description": "线索中心可直接转入跟进或企业库；跟进管理可保存阶段、负责人、沟通结果、提醒和完成状态，并自动沉淀历史事件。",
+    "owner_insight": {
+      "title": "负责人视图",
+      "description": "按负责人查看当前待办分布，优先处理逾期和高优先级企业。",
+      "total": "共 {{count}} 家",
+      "overdue": "逾期 {{count}}",
+      "today": "今日 {{count}}",
+      "priority": "优先 {{count}}",
+      "completed": "完成 {{count}}"
+    },
+    "action_insight": {
+      "title": "下一步动作分布",
+      "description": "统计当前企业最常见的下一步动作，便于你看出今天的主要推进方向。",
+      "count": "{{count}} 家"
+    },
     "history": {
       "title": "跟进时间线",
       "count": "最近 {{count}} 条",
@@ -608,6 +639,22 @@
   "sources": {
     "title": "数据源状态概览",
     "description": "集中查看各条数据链路是否更新、写入多少数据、对应哪个接口和数据库快照。",
+    "quality": {
+      "title": "数据质量校验",
+      "description": "先把会影响判断口径的问题暴露出来，再决定是补证据、做去重，还是继续自动入库。",
+      "pending_duplicates": "待处理重复组",
+      "pending_duplicates_detail": "涉及 {{count}} 家疑似重复企业，尚未做人工决策。",
+      "missing_published_at": "缺少发布时间",
+      "missing_published_at_detail": "这类线索会影响时间排序和日报/周报统计。",
+      "low_evidence": "低证据线索",
+      "low_evidence_detail": "当前没有有效证据条目，建议后续补公开来源。",
+      "untouched": "未做动作",
+      "untouched_detail": "线索还未标记有效/无效/跟进/入企业库。",
+      "missing_city": "缺少城市 {{count}}",
+      "missing_source": "缺少来源 {{count}}",
+      "resolved_duplicates": "已处理去重 {{count}}",
+      "issue_total": "问题总量 {{count}}"
+    },
     "cards": {
       "report_title": "OpenClaw 日报",
       "report_detail": "已同步 {{count}} 条日报类信息",
