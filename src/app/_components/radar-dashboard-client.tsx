@@ -110,6 +110,45 @@ type RecruitmentLeadsPayload = {
   platformCoverage?: RecruitmentPlatformCoverage[];
 };
 
+type OverviewStatsPayload = {
+  updatedAt: string;
+  salesUpdatedAt?: string;
+  trend?: {
+    days: Array<{
+      date: string;
+      label: string;
+      total: number;
+      report: number;
+      recruitment: number;
+      highStrength: number;
+    }>;
+  };
+  funnel?: {
+    totalSignals: number;
+    companyCount: number;
+    actionCompanyCount: number;
+    activeFollowUps: number;
+    closedFollowUps: number;
+  };
+  platforms?: {
+    selectedPlatforms: string[];
+    coverage: RecruitmentPlatformCoverage[];
+    updatedAt?: string;
+    status?: string;
+  };
+  sources?: {
+    normalCount: number;
+    totalCount: number;
+    items: Array<{
+      key: string;
+      label: string;
+      updatedAt: string;
+      count: number;
+      status: "normal" | "stale" | "missing";
+    }>;
+  };
+};
+
 type CompanyProfilesPayload = {
   items: CompanyProfileRecord[];
   totals?: {
@@ -673,11 +712,13 @@ function OverviewConversionPanel({
   companyEntries,
   followUpRecords,
   leadActions,
+  overviewStats,
 }: {
   salesIntelData: SalesIntelData;
   companyEntries: CompanyLibraryEntry[];
   followUpRecords: FollowUpRecord[];
   leadActions: LeadActionRecord[];
+  overviewStats: OverviewStatsPayload | null;
 }) {
   const { t } = useTranslation();
   const totalSignals = Math.max(salesIntelData.totals.overall, 1);
@@ -693,35 +734,36 @@ function OverviewConversionPanel({
   const closedFollowUps = followUpRecords.filter(
     (record) => record.reminderStatus === "completed"
   ).length;
+  const funnel = overviewStats?.funnel;
   const stages = [
     {
       key: "signals",
       label: t("overview.conversion.signals"),
-      value: salesIntelData.totals.overall,
+      value: funnel?.totalSignals ?? salesIntelData.totals.overall,
       detail: t("overview.conversion.signals_detail"),
     },
     {
       key: "companies",
       label: t("overview.conversion.companies"),
-      value: companyEntries.length,
+      value: funnel?.companyCount ?? companyEntries.length,
       detail: t("overview.conversion.companies_detail"),
     },
     {
       key: "actions",
       label: t("overview.conversion.actions"),
-      value: actionCompanies.size,
+      value: funnel?.actionCompanyCount ?? actionCompanies.size,
       detail: t("overview.conversion.actions_detail"),
     },
     {
       key: "active",
       label: t("overview.conversion.active"),
-      value: activeFollowUps,
+      value: funnel?.activeFollowUps ?? activeFollowUps,
       detail: t("overview.conversion.active_detail"),
     },
     {
       key: "closed",
       label: t("overview.conversion.closed"),
-      value: closedFollowUps,
+      value: funnel?.closedFollowUps ?? closedFollowUps,
       detail: t("overview.conversion.closed_detail"),
     },
   ];
@@ -754,9 +796,8 @@ function OverviewConversionPanel({
   );
 }
 
-function OverviewTrendPanel({ items }: { items: SalesIntelItem[] }) {
-  const { t } = useTranslation();
-  const buckets = new Map<string, number>();
+function buildFallbackTrendItems(items: SalesIntelItem[]) {
+  const buckets = new Map<string, { total: number; report: number; recruitment: number }>();
   const parsedDates: Date[] = [];
 
   items.forEach((item) => {
@@ -768,33 +809,71 @@ function OverviewTrendPanel({ items }: { items: SalesIntelItem[] }) {
     }
 
     const key = parsed.toISOString().slice(0, 10);
+    const bucket = buckets.get(key) ?? { total: 0, report: 0, recruitment: 0 };
+    bucket.total += 1;
+
+    if (item.kind === "report") {
+      bucket.report += 1;
+    }
+
+    if (item.kind === "recruitment") {
+      bucket.recruitment += 1;
+    }
+
     parsedDates.push(parsed);
-    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    buckets.set(key, bucket);
   });
 
   if (!parsedDates.length) {
+    return [];
+  }
+
+  const baseDate = new Date(Math.max(...parsedDates.map((date) => date.getTime())));
+  baseDate.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: 7 }).map((_, index) => {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() - (6 - index));
+
+    const key = date.toISOString().slice(0, 10);
+    const bucket = buckets.get(key) ?? { total: 0, report: 0, recruitment: 0 };
+
+    return {
+      key,
+      label: `${date.getMonth() + 1}/${date.getDate()}`,
+      total: bucket.total,
+      report: bucket.report,
+      recruitment: bucket.recruitment,
+    };
+  });
+}
+
+function OverviewTrendPanel({
+  items,
+  overviewStats,
+}: {
+  items: SalesIntelItem[];
+  overviewStats: OverviewStatsPayload | null;
+}) {
+  const { t } = useTranslation();
+  const trendItems = overviewStats?.trend?.days?.length
+    ? overviewStats.trend.days.map((item) => ({
+        key: item.date,
+        label: item.label,
+        total: item.total,
+        report: item.report,
+        recruitment: item.recruitment,
+      }))
+    : buildFallbackTrendItems(items);
+
+  if (!trendItems.length) {
     return (
       <Card title={t("overview.trend.title")} className="h-full">
         <Empty description={t("sales_intel.no_data")} />
       </Card>
     );
   }
-
-  const baseDate = new Date(Math.max(...parsedDates.map((date) => date.getTime())));
-  baseDate.setHours(0, 0, 0, 0);
-
-  const trendItems = Array.from({ length: 7 }).map((_, index) => {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() - (6 - index));
-
-    const key = date.toISOString().slice(0, 10);
-    return {
-      key,
-      label: `${date.getMonth() + 1}/${date.getDate()}`,
-      value: buckets.get(key) ?? 0,
-    };
-  });
-  const maxValue = Math.max(...trendItems.map((item) => item.value), 1);
+  const maxValue = Math.max(...trendItems.map((item) => item.total), 1);
 
   return (
     <Card title={t("overview.trend.title")} className="h-full">
@@ -806,11 +885,11 @@ function OverviewTrendPanel({ items }: { items: SalesIntelItem[] }) {
           <div key={item.key} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-2">
             <div
               className="min-h-2 rounded-t-full bg-[linear-gradient(180deg,#b66b3a,#e3b782)] transition-all"
-              style={{ height: `${Math.max(8, (item.value / maxValue) * 100)}%` }}
-              title={`${item.label}: ${item.value}`}
+              style={{ height: `${Math.max(8, (item.total / maxValue) * 100)}%` }}
+              title={`${item.label}: ${item.total}`}
             />
             <div className="text-center">
-              <Typography.Text className="block text-sm font-semibold">{item.value}</Typography.Text>
+              <Typography.Text className="block text-sm font-semibold">{item.total}</Typography.Text>
               <Typography.Text type="secondary" className="block text-xs">
                 {item.label}
               </Typography.Text>
@@ -818,6 +897,116 @@ function OverviewTrendPanel({ items }: { items: SalesIntelItem[] }) {
           </div>
         ))}
       </div>
+    </Card>
+  );
+}
+
+function OverviewOperationalPanel({
+  overviewStats,
+  salesIntelData,
+}: {
+  overviewStats: OverviewStatsPayload | null;
+  salesIntelData: SalesIntelData;
+}) {
+  const { t } = useTranslation();
+  const sourceItems = overviewStats?.sources?.items ?? [];
+  const sourceHealthPercent =
+    overviewStats?.sources?.totalCount && overviewStats.sources.totalCount > 0
+      ? Math.round((overviewStats.sources.normalCount / overviewStats.sources.totalCount) * 100)
+      : 0;
+  const selectedPlatforms =
+    overviewStats?.platforms?.selectedPlatforms?.length
+      ? overviewStats.platforms.selectedPlatforms
+      : salesIntelData.todaySearchItems ?? [];
+  const coverage = overviewStats?.platforms?.coverage ?? [];
+
+  function renderSourceTag(status: string) {
+    if (status === "normal") {
+      return <Tag color="green">{t("sources.status.normal")}</Tag>;
+    }
+
+    if (status === "stale") {
+      return <Tag color="gold">{t("sources.status.stale")}</Tag>;
+    }
+
+    return <Tag>{t("sources.status.missing")}</Tag>;
+  }
+
+  return (
+    <Card
+      title={t("overview.operational.title")}
+      extra={
+        <Link href="/sources">
+          <Button type="link">{t("overview.open_sources")}</Button>
+        </Link>
+      }
+    >
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+        <div className="rounded-[1.3rem] border border-(--color-line) bg-(--color-card-soft) p-4">
+          <Statistic
+            title={t("overview.operational.health")}
+            value={sourceHealthPercent}
+            suffix="%"
+          />
+          <Progress percent={sourceHealthPercent} showInfo={false} strokeColor="#35616c" />
+          <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+            {t("overview.operational.health_detail", {
+              normal: overviewStats?.sources?.normalCount ?? 0,
+              total: overviewStats?.sources?.totalCount ?? 0,
+            })}
+          </Typography.Paragraph>
+        </div>
+
+        <div className="grid gap-3">
+          <div>
+            <Typography.Text strong>{t("overview.operational.platforms")}</Typography.Text>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedPlatforms.length ? (
+                selectedPlatforms.slice(0, 8).map((platform) => (
+                  <Tag key={platform} color="blue">
+                    {platform}
+                  </Tag>
+                ))
+              ) : (
+                <Tag>{t("overview.operational.no_platforms")}</Tag>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {coverage.slice(0, 4).map((item) => (
+              <div key={item.platform} className="rounded-[1rem] bg-white/55 px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Typography.Text strong>{item.platform}</Typography.Text>
+                  <Tag color={item.status === "success" || item.status === "ok" ? "green" : "default"}>
+                    {item.status || t("sources.platforms.status_waiting")}
+                  </Tag>
+                </div>
+                <Typography.Text type="secondary" className="mt-1 block">
+                  {t("sources.platforms.effective_count", {
+                    count: item.effectiveCompanyCount ?? 0,
+                  })}
+                </Typography.Text>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {sourceItems.length ? (
+        <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {sourceItems.map((item) => (
+            <div key={item.key} className="rounded-[1rem] border border-(--color-line) px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Typography.Text strong>{item.label}</Typography.Text>
+                {renderSourceTag(item.status)}
+              </div>
+              <Typography.Text type="secondary" className="mt-1 block">
+                {item.updatedAt ? formatDisplayUpdatedAt(item.updatedAt) : t("sales_intel.not_synced")}
+              </Typography.Text>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -909,6 +1098,7 @@ function OverviewCommandCenter({
   visibleCompetitors,
   followUpRecords,
   leadActions,
+  overviewStats,
 }: {
   salesIntelData: SalesIntelData;
   competitorData: CompetitorData;
@@ -916,6 +1106,7 @@ function OverviewCommandCenter({
   visibleCompetitors: CompetitorCompany[];
   followUpRecords: FollowUpRecord[];
   leadActions: LeadActionRecord[];
+  overviewStats: OverviewStatsPayload | null;
 }) {
   const { t } = useTranslation();
   const quickCards = [
@@ -967,9 +1158,12 @@ function OverviewCommandCenter({
           companyEntries={companyEntries}
           followUpRecords={followUpRecords}
           leadActions={leadActions}
+          overviewStats={overviewStats}
         />
-        <OverviewTrendPanel items={salesIntelData.feed} />
+        <OverviewTrendPanel items={salesIntelData.feed} overviewStats={overviewStats} />
       </div>
+
+      <OverviewOperationalPanel overviewStats={overviewStats} salesIntelData={salesIntelData} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.78fr)]">
         <OverviewLeadPreview items={salesIntelData.feed} />
@@ -1381,6 +1575,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
     groups: [],
     decisions: [],
   });
+  const [overviewStats, setOverviewStats] = useState<OverviewStatsPayload | null>(null);
   const [apiHealth, setApiHealth] = useState<ApiHealthPayload | null>(null);
   const [selectedMapCompetitorKey, setSelectedMapCompetitorKey] = useState<string | null>(null);
   const [expandedCompetitorKey, setExpandedCompetitorKey] = useState<string | null>(null);
@@ -1405,6 +1600,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         companyProfilesResult,
         leadActionsResult,
         companyDuplicatesResult,
+        overviewStatsResult,
         recruitmentLeadsResult,
         healthResult,
       ] = await Promise.allSettled([
@@ -1427,6 +1623,11 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         loadJsonWithFallback<CompanyDuplicatesResponsePayload>(
           createRemoteOnlyDataSources("/api/company-duplicates")
         ),
+        view === "overview"
+          ? loadJsonWithFallback<OverviewStatsPayload>(
+              createRemoteOnlyDataSources("/api/overview/stats")
+            )
+          : Promise.resolve(null),
         shouldLoadOperationalStatus
           ? loadJsonWithFallback<RecruitmentLeadsPayload>(
               createRemoteOnlyDataSources("/api/recruitment/leads")
@@ -1472,6 +1673,9 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
           ? companyDuplicatesResult.value
           : { groups: [], decisions: [] }
       );
+      setOverviewStats(
+        overviewStatsResult.status === "fulfilled" ? (overviewStatsResult.value ?? null) : null
+      );
       setRecruitmentLeadsData(
         recruitmentLeadsResult.status === "fulfilled"
           ? recruitmentLeadsResult.value
@@ -1493,6 +1697,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       setCompanyProfiles([]);
       setLeadActions([]);
       setCompanyDuplicates({ groups: [], decisions: [] });
+      setOverviewStats(null);
       setRecruitmentLeadsData(fallbackRecruitmentLeadsData);
       setApiHealth(null);
       setIsInitialLoading(false);
@@ -1656,6 +1861,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
             visibleCompetitors={visibleCompetitors}
             followUpRecords={followUpRecords}
             leadActions={leadActions}
+            overviewStats={overviewStats}
           />
         );
       case "leads":

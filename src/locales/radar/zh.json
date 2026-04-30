@@ -223,7 +223,14 @@
     },
     "trend": {
       "title": "近 7 日新增趋势",
-      "description": "按检索时间或发布时间统计最近 7 天新增线索，先用于判断每日数据是否断档。"
+      "description": "由后端按检索时间或发布时间聚合最近 7 天新增线索，先用于判断每日数据是否断档。"
+    },
+    "operational": {
+      "title": "今日运行摘要",
+      "health": "链路健康度",
+      "health_detail": "{{normal}} / {{total}} 条关键链路在最近时间窗口内有更新。",
+      "platforms": "今日平台与检索项",
+      "no_platforms": "暂无平台记录"
     },
     "quick": {
       "title": "下一步入口",

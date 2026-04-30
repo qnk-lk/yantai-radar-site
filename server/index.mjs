@@ -314,6 +314,183 @@ function createSalesIntelListPayload(payload) {
   };
 }
 
+function getSalesIntelItemDateKey(item) {
+  return getShanghaiDateKey(item?.retrievedAt || normalizeSalesIntelPublishedAt(item));
+}
+
+function createTrendDateRange(items, updatedAt, days = 7) {
+  const parsedTimes = items
+    .map((item) => {
+      const dateKey = getSalesIntelItemDateKey(item);
+      return dateKey ? new Date(`${dateKey}T00:00:00+08:00`).getTime() : Number.NaN;
+    })
+    .filter((value) => Number.isFinite(value));
+  const fallbackTime = getShanghaiDateKey(updatedAt)
+    ? new Date(`${getShanghaiDateKey(updatedAt)}T00:00:00+08:00`).getTime()
+    : Date.now();
+  const baseTime = parsedTimes.length ? Math.max(...parsedTimes) : fallbackTime;
+  const baseDate = new Date(baseTime);
+
+  return Array.from({ length: days }).map((_, index) => {
+    const date = new Date(baseDate);
+    date.setDate(baseDate.getDate() - (days - 1 - index));
+    const dateKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+
+    return {
+      date: dateKey,
+      label: `${date.getMonth() + 1}/${date.getDate()}`,
+      total: 0,
+      report: 0,
+      recruitment: 0,
+      highStrength: 0,
+    };
+  });
+}
+
+function isHighStrength(value) {
+  return ["高", "high", "strong"].includes(String(value || "").trim().toLowerCase());
+}
+
+function buildSalesTrend(payload) {
+  const items = Array.isArray(payload?.feed) ? payload.feed : [];
+  const days = createTrendDateRange(items, payload?.updatedAt);
+  const dayMap = new Map(days.map((item) => [item.date, item]));
+
+  for (const item of items) {
+    const dateKey = getSalesIntelItemDateKey(item);
+    const bucket = dayMap.get(dateKey);
+
+    if (!bucket) {
+      continue;
+    }
+
+    bucket.total += 1;
+
+    if (item?.kind === "report") {
+      bucket.report += 1;
+    }
+
+    if (item?.kind === "recruitment") {
+      bucket.recruitment += 1;
+    }
+
+    if (isHighStrength(item?.strength)) {
+      bucket.highStrength += 1;
+    }
+  }
+
+  return days;
+}
+
+function getFreshnessStatus(updatedAt, maxAgeHours = 30) {
+  const dateKey = getShanghaiDateKey(updatedAt);
+
+  if (!dateKey) {
+    return "missing";
+  }
+
+  const parsedDate = new Date(String(updatedAt).replace(/\s*CST$/u, ""));
+  const time = Number.isNaN(parsedDate.getTime())
+    ? new Date(`${dateKey}T00:00:00+08:00`).getTime()
+    : parsedDate.getTime();
+  const ageHours = (Date.now() - time) / (1000 * 60 * 60);
+
+  if (ageHours > maxAgeHours) {
+    return "stale";
+  }
+
+  return "normal";
+}
+
+function buildOverviewStatsPayload(db) {
+  const salesDocument = readDocument(db, "salesIntel");
+  const recruitmentDocument = readDocument(db, "recruitmentLeads");
+  const competitorDocument = readDocument(db, "competitors");
+  const salesPayload = salesDocument?.payload ?? {};
+  const recruitmentPayload = recruitmentDocument?.payload ?? {};
+  const competitorPayload = competitorDocument?.payload ?? {};
+  const currentSalesPayload = createCurrentDaySalesIntelPayload(salesPayload);
+  const leadActions = readLeadActions(db);
+  const followUpRecords = readFollowUpRecords(db);
+  const companyProfiles = readCompanyProfiles(db);
+  const actionCompanyIds = new Set(
+    leadActions
+      .filter((item) => item.status === "follow_up" || item.status === "company")
+      .map((item) => item.companyId)
+      .filter(Boolean)
+  );
+  const selectedPlatforms = [
+    ...(recruitmentPayload?.strategy?.selectedPlatforms ?? []),
+    ...(recruitmentPayload?.strategy?.primaryPlatforms ?? []),
+  ].filter(Boolean);
+  const sourceItems = [
+    {
+      key: "report",
+      label: "OpenClaw 日报",
+      updatedAt:
+        currentSalesPayload.sourceBreakdown?.find((item) => item?.kind === "report")?.updatedAt ??
+        "",
+      count: currentSalesPayload.totals?.reportItems ?? 0,
+    },
+    {
+      key: "recruitment",
+      label: "招聘与平台聚合",
+      updatedAt:
+        currentSalesPayload.sourceBreakdown?.find((item) => item?.kind === "recruitment")
+          ?.updatedAt ?? "",
+      count: currentSalesPayload.totals?.recruitmentItems ?? 0,
+    },
+    {
+      key: "competitor",
+      label: "同行链路",
+      updatedAt: competitorPayload?.updatedAt ?? competitorDocument?.updatedAt ?? "",
+      count: Array.isArray(competitorPayload?.competitors) ? competitorPayload.competitors.length : 0,
+    },
+    {
+      key: "followUp",
+      label: "跟进记录",
+      updatedAt: followUpRecords[0]?.updatedAt ?? "",
+      count: followUpRecords.length,
+    },
+  ].map((item) => ({
+    ...item,
+    status: getFreshnessStatus(item.updatedAt),
+  }));
+
+  return {
+    updatedAt: new Date().toISOString(),
+    salesUpdatedAt: currentSalesPayload.updatedAt ?? salesDocument?.updatedAt ?? "",
+    trend: {
+      days: buildSalesTrend(salesPayload),
+    },
+    funnel: {
+      totalSignals: currentSalesPayload.totals?.overall ?? 0,
+      companyCount: companyProfiles.length,
+      actionCompanyCount: actionCompanyIds.size,
+      activeFollowUps: followUpRecords.filter((item) => item.reminderStatus !== "completed").length,
+      closedFollowUps: followUpRecords.filter((item) => item.reminderStatus === "completed").length,
+    },
+    platforms: {
+      selectedPlatforms: [...new Set(selectedPlatforms)],
+      coverage: Array.isArray(recruitmentPayload?.platformCoverage)
+        ? recruitmentPayload.platformCoverage
+        : [],
+      updatedAt: recruitmentPayload?.updatedAt ?? recruitmentDocument?.updatedAt ?? "",
+      status: recruitmentPayload?.status ?? "",
+    },
+    sources: {
+      normalCount: sourceItems.filter((item) => item.status === "normal").length,
+      totalCount: sourceItems.length,
+      items: sourceItems,
+    },
+  };
+}
+
 function findSalesIntelItem(payload, itemId) {
   const collections = [payload?.feed, payload?.todayHighlights];
 
@@ -437,6 +614,8 @@ function buildApp(config, db) {
 
     return item;
   });
+
+  app.get("/api/overview/stats", async () => buildOverviewStatsPayload(db));
 
   app.get("/api/company-duplicates", async (_request, reply) => {
     const document = readDocument(db, "salesIntel");
