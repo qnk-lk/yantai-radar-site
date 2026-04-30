@@ -84,6 +84,14 @@ type RecruitmentPlatformCoverage = {
   status: string;
   querySummary?: string;
   effectiveCompanyCount?: number;
+  durationMs?: number;
+  elapsedMs?: number;
+  writtenCount?: number;
+  leadCount?: number;
+  outputCount?: number;
+  error?: string;
+  lastLog?: string;
+  logPath?: string;
   note?: string;
   updatedAt?: string;
 };
@@ -263,6 +271,32 @@ function getMappableCompetitorCount(companies: CompetitorCompany[]) {
     (company) =>
       Number.isFinite(Number(company.latitude)) && Number.isFinite(Number(company.longitude))
   ).length;
+}
+
+function formatDurationMs(value?: number) {
+  if (!Number.isFinite(value)) {
+    return "";
+  }
+
+  const duration = Number(value);
+
+  if (duration < 1000) {
+    return `${Math.max(0, Math.round(duration))}ms`;
+  }
+
+  return `${(duration / 1000).toFixed(duration < 10_000 ? 1 : 0)}s`;
+}
+
+function getPlatformDuration(item: RecruitmentPlatformCoverage) {
+  return item.durationMs ?? item.elapsedMs;
+}
+
+function getPlatformWrittenCount(item: RecruitmentPlatformCoverage) {
+  return item.writtenCount ?? item.leadCount ?? item.outputCount ?? item.effectiveCompanyCount;
+}
+
+function getPlatformLogText(item: RecruitmentPlatformCoverage) {
+  return item.error || item.lastLog || item.note || item.logPath || "";
 }
 
 function MetricCard({
@@ -634,6 +668,160 @@ function OverviewStatusPanel({
   );
 }
 
+function OverviewConversionPanel({
+  salesIntelData,
+  companyEntries,
+  followUpRecords,
+  leadActions,
+}: {
+  salesIntelData: SalesIntelData;
+  companyEntries: CompanyLibraryEntry[];
+  followUpRecords: FollowUpRecord[];
+  leadActions: LeadActionRecord[];
+}) {
+  const { t } = useTranslation();
+  const totalSignals = Math.max(salesIntelData.totals.overall, 1);
+  const actionCompanies = new Set(
+    leadActions
+      .filter((item) => item.status === "follow_up" || item.status === "company")
+      .map((item) => item.companyId)
+      .filter(Boolean)
+  );
+  const activeFollowUps = followUpRecords.filter(
+    (record) => record.reminderStatus !== "completed"
+  ).length;
+  const closedFollowUps = followUpRecords.filter(
+    (record) => record.reminderStatus === "completed"
+  ).length;
+  const stages = [
+    {
+      key: "signals",
+      label: t("overview.conversion.signals"),
+      value: salesIntelData.totals.overall,
+      detail: t("overview.conversion.signals_detail"),
+    },
+    {
+      key: "companies",
+      label: t("overview.conversion.companies"),
+      value: companyEntries.length,
+      detail: t("overview.conversion.companies_detail"),
+    },
+    {
+      key: "actions",
+      label: t("overview.conversion.actions"),
+      value: actionCompanies.size,
+      detail: t("overview.conversion.actions_detail"),
+    },
+    {
+      key: "active",
+      label: t("overview.conversion.active"),
+      value: activeFollowUps,
+      detail: t("overview.conversion.active_detail"),
+    },
+    {
+      key: "closed",
+      label: t("overview.conversion.closed"),
+      value: closedFollowUps,
+      detail: t("overview.conversion.closed_detail"),
+    },
+  ];
+
+  return (
+    <Card title={t("overview.conversion.title")} className="h-full">
+      <div className="grid gap-4">
+        {stages.map((stage) => {
+          const percent = Math.min(100, Math.round((stage.value / totalSignals) * 100));
+
+          return (
+            <div key={stage.key} className="rounded-[1.15rem] bg-(--color-card-soft) px-4 py-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Typography.Text strong>{stage.label}</Typography.Text>
+                  <Typography.Text type="secondary" className="mt-1 block">
+                    {stage.detail}
+                  </Typography.Text>
+                </div>
+                <Typography.Text className="text-2xl font-semibold text-(--color-ink)">
+                  {stage.value}
+                </Typography.Text>
+              </div>
+              <Progress percent={percent} showInfo={false} strokeColor="#b66b3a" />
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function OverviewTrendPanel({ items }: { items: SalesIntelItem[] }) {
+  const { t } = useTranslation();
+  const buckets = new Map<string, number>();
+  const parsedDates: Date[] = [];
+
+  items.forEach((item) => {
+    const value = getSalesItemTime(item);
+    const parsed = parseDisplayDate(value);
+
+    if (!parsed) {
+      return;
+    }
+
+    const key = parsed.toISOString().slice(0, 10);
+    parsedDates.push(parsed);
+    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  });
+
+  if (!parsedDates.length) {
+    return (
+      <Card title={t("overview.trend.title")} className="h-full">
+        <Empty description={t("sales_intel.no_data")} />
+      </Card>
+    );
+  }
+
+  const baseDate = new Date(Math.max(...parsedDates.map((date) => date.getTime())));
+  baseDate.setHours(0, 0, 0, 0);
+
+  const trendItems = Array.from({ length: 7 }).map((_, index) => {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() - (6 - index));
+
+    const key = date.toISOString().slice(0, 10);
+    return {
+      key,
+      label: `${date.getMonth() + 1}/${date.getDate()}`,
+      value: buckets.get(key) ?? 0,
+    };
+  });
+  const maxValue = Math.max(...trendItems.map((item) => item.value), 1);
+
+  return (
+    <Card title={t("overview.trend.title")} className="h-full">
+      <Typography.Paragraph type="secondary">
+        {t("overview.trend.description")}
+      </Typography.Paragraph>
+      <div className="flex h-64 items-end gap-3 rounded-[1.3rem] border border-(--color-line) bg-white/55 px-4 py-5">
+        {trendItems.map((item) => (
+          <div key={item.key} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-2">
+            <div
+              className="min-h-2 rounded-t-full bg-[linear-gradient(180deg,#b66b3a,#e3b782)] transition-all"
+              style={{ height: `${Math.max(8, (item.value / maxValue) * 100)}%` }}
+              title={`${item.label}: ${item.value}`}
+            />
+            <div className="text-center">
+              <Typography.Text className="block text-sm font-semibold">{item.value}</Typography.Text>
+              <Typography.Text type="secondary" className="block text-xs">
+                {item.label}
+              </Typography.Text>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function OverviewCompanySnapshot({ entries }: { entries: CompanyLibraryEntry[] }) {
   const { t } = useTranslation();
   const topEntries = entries.slice(0, 4);
@@ -719,11 +907,15 @@ function OverviewCommandCenter({
   competitorData,
   companyEntries,
   visibleCompetitors,
+  followUpRecords,
+  leadActions,
 }: {
   salesIntelData: SalesIntelData;
   competitorData: CompetitorData;
   companyEntries: CompanyLibraryEntry[];
   visibleCompetitors: CompetitorCompany[];
+  followUpRecords: FollowUpRecord[];
+  leadActions: LeadActionRecord[];
 }) {
   const { t } = useTranslation();
   const quickCards = [
@@ -767,6 +959,16 @@ function OverviewCommandCenter({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <OverviewCompanySnapshot entries={companyEntries} />
         <OverviewStatusPanel salesIntelData={salesIntelData} competitorData={competitorData} />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <OverviewConversionPanel
+          salesIntelData={salesIntelData}
+          companyEntries={companyEntries}
+          followUpRecords={followUpRecords}
+          leadActions={leadActions}
+        />
+        <OverviewTrendPanel items={salesIntelData.feed} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.78fr)]">
@@ -821,9 +1023,9 @@ function SourcesPanel({
       .filter((item) => item?.platform)
       .map((item) => [item.platform, item])
   );
-  const platformItems = configuredPlatforms.map((platform) => ({
+  const platformItems: RecruitmentPlatformCoverage[] = configuredPlatforms.map((platform) => ({
+    ...(coverageMap.get(platform) ?? { status: "" }),
     platform,
-    ...(coverageMap.get(platform) ?? {}),
   }));
   const sourceItems = [
     {
@@ -1049,34 +1251,59 @@ function SourcesPanel({
           {recruitmentLeadsData.status || t("sources.platforms.description")}
         </Typography.Paragraph>
         <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
-          {platformItems.map((item) => (
-            <div
-              key={item.platform}
-              className="rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) p-4"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <Typography.Text strong>{item.platform}</Typography.Text>
-                {renderPlatformStatusTag(item.status || "")}
+          {platformItems.map((item) => {
+            const durationText = formatDurationMs(getPlatformDuration(item));
+            const writtenCount = getPlatformWrittenCount(item);
+            const logText = getPlatformLogText(item);
+
+            return (
+              <div
+                key={item.platform}
+                className="rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <Typography.Text strong>{item.platform}</Typography.Text>
+                  {renderPlatformStatusTag(item.status || "")}
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <div className="grid gap-2 rounded-[1rem] bg-white/55 p-3 text-sm">
+                    <Typography.Text type="secondary">
+                      {t("sources.platforms.last_updated", {
+                        value: item.updatedAt
+                          ? formatDisplayUpdatedAt(item.updatedAt)
+                          : t("sales_intel.not_synced"),
+                      })}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      {t("sources.platforms.duration", {
+                        value: durationText || t("sources.platforms.unknown_duration"),
+                      })}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      {t("sources.platforms.written_count", {
+                        count: writtenCount ?? 0,
+                      })}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      {t("sources.platforms.effective_count", {
+                        count: item.effectiveCompanyCount ?? 0,
+                      })}
+                    </Typography.Text>
+                  </div>
+                  <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
+                    {item.querySummary || t("sources.platforms.no_query")}
+                  </Typography.Paragraph>
+                  <Typography.Paragraph
+                    type="secondary"
+                    ellipsis={{ rows: 3 }}
+                    style={{ marginBottom: 0 }}
+                  >
+                    {logText || t("sources.platforms.no_log")}
+                  </Typography.Paragraph>
+                </div>
               </div>
-              <div className="mt-3 grid gap-2">
-                <Typography.Text type="secondary">
-                  {t("sources.platforms.effective_count", {
-                    count: item.effectiveCompanyCount ?? 0,
-                  })}
-                </Typography.Text>
-                <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0 }}>
-                  {item.querySummary || t("sources.platforms.no_query")}
-                </Typography.Paragraph>
-                <Typography.Paragraph
-                  type="secondary"
-                  ellipsis={{ rows: 2 }}
-                  style={{ marginBottom: 0 }}
-                >
-                  {item.note || t("sources.platforms.no_note")}
-                </Typography.Paragraph>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
 
@@ -1165,6 +1392,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
 
   useEffect(() => {
     let active = true;
+    const shouldLoadOperationalStatus = view === "overview" || view === "sources";
 
     async function loadData() {
       setIsInitialLoading(true);
@@ -1199,12 +1427,12 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         loadJsonWithFallback<CompanyDuplicatesResponsePayload>(
           createRemoteOnlyDataSources("/api/company-duplicates")
         ),
-        view === "sources"
+        shouldLoadOperationalStatus
           ? loadJsonWithFallback<RecruitmentLeadsPayload>(
               createRemoteOnlyDataSources("/api/recruitment/leads")
             )
           : Promise.resolve(fallbackRecruitmentLeadsData),
-        view === "sources"
+        shouldLoadOperationalStatus
           ? loadJsonWithFallback<ApiHealthPayload>(createRemoteOnlyDataSources("/api/health"))
           : Promise.resolve(null),
       ]);
@@ -1426,6 +1654,8 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
             competitorData={competitorData}
             companyEntries={companyEntries}
             visibleCompetitors={visibleCompetitors}
+            followUpRecords={followUpRecords}
+            leadActions={leadActions}
           />
         );
       case "leads":

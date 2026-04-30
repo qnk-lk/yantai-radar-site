@@ -208,6 +208,23 @@
       "synced": "已同步",
       "waiting": "等待同步"
     },
+    "conversion": {
+      "title": "线索转化漏斗",
+      "signals": "总线索",
+      "signals_detail": "销售总表里可被判断的全部信息。",
+      "companies": "企业归档",
+      "companies_detail": "已经按公司聚合后的企业数量。",
+      "actions": "已转动作",
+      "actions_detail": "已标记跟进或进入企业库的公司。",
+      "active": "进行中",
+      "active_detail": "跟进管理中尚未关闭的记录。",
+      "closed": "已闭环",
+      "closed_detail": "已完成的跟进记录。"
+    },
+    "trend": {
+      "title": "近 7 日新增趋势",
+      "description": "按检索时间或发布时间统计最近 7 天新增线索，先用于判断每日数据是否断档。"
+    },
     "quick": {
       "title": "下一步入口",
       "leads_title": "今日重点",
@@ -602,8 +619,13 @@
       "status_skipped": "跳过",
       "status_waiting": "待同步",
       "effective_count": "有效公司：{{count}} 家",
+      "last_updated": "平台更新时间：{{value}}",
+      "duration": "执行耗时：{{value}}",
+      "unknown_duration": "未记录",
+      "written_count": "写入线索：{{count}} 条",
       "no_query": "暂无检索摘要",
-      "no_note": "暂无说明"
+      "no_note": "暂无说明",
+      "no_log": "暂无日志或异常说明"
     },
     "health": {
       "title": "接口与数据库状态",
