@@ -208,19 +208,81 @@ function getStageWeight(stage: FollowUpStage) {
   return 100;
 }
 
+function getTaskPriorityScore(entry: FollowUpBoardEntry) {
+  const reminderState = getReminderState(entry.followUpRecord);
+  const reminderWeight =
+    reminderState === "overdue"
+      ? 800
+      : reminderState === "today"
+        ? 700
+        : reminderState === "unset"
+          ? 120
+          : reminderState === "completed"
+            ? -300
+            : 0;
+  const interestedWeight = entry.followUpRecord?.contactResult === "interested" ? 80 : 0;
+  const unassignedPenalty = entry.followUpRecord?.owner ? 0 : -30;
+
+  return reminderWeight + entry.stageScore + interestedWeight + unassignedPenalty;
+}
+
+function createFollowUpValues(
+  entry: FollowUpBoardEntry,
+  nextValues: Partial<FollowUpFormValues> = {}
+): FollowUpFormValues {
+  const record = entry.followUpRecord;
+
+  return {
+    stage: record?.stage ?? entry.stage,
+    owner: record?.owner ?? "",
+    communicationMethod: record?.communicationMethod ?? "",
+    contactResult: record?.contactResult ?? "",
+    nextAction: record?.nextAction ?? "",
+    dealStage: record?.dealStage ?? "",
+    nextReminderAt: record?.nextReminderAt ?? "",
+    reminderStatus: record?.reminderStatus ?? "open",
+    completedAt: record?.completedAt ?? "",
+    note: record?.note ?? "",
+    lastFollowedAt: record?.lastFollowedAt ?? "",
+    ...nextValues,
+  };
+}
+
 function MetricCard({
   icon,
   label,
   value,
   detail,
+  active = false,
+  onClick,
 }: {
   icon: ReactNode;
   label: string;
   value: number;
   detail: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
+  const interactiveClassName = onClick
+    ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(69,49,28,0.12)]"
+    : "";
+  const activeClassName = active ? "ring-2 ring-(--color-accent)/45" : "";
+
   return (
-    <Card className="h-full">
+    <Card
+      className={`h-full ${interactiveClassName} ${activeClassName}`}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (!onClick || (event.key !== "Enter" && event.key !== " ")) {
+          return;
+        }
+
+        event.preventDefault();
+        onClick();
+      }}
+    >
       <div className="flex items-start justify-between gap-4">
         <Statistic title={label} value={value} />
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-(--color-card-soft) text-lg text-(--color-accent)">
@@ -271,12 +333,23 @@ function FollowUpTaskBoard({
   return (
     <Card
       title={t("follow_ups.task_board.title")}
-      extra={<Typography.Text type="secondary">{t("follow_ups.task_board.subtitle")}</Typography.Text>}
+      extra={
+        <Typography.Text type="secondary">{t("follow_ups.task_board.subtitle")}</Typography.Text>
+      }
     >
       <div className="grid gap-4 xl:grid-cols-3">
         {groups.map((group) => {
           const groupEntries = entries
             .filter((entry) => getReminderState(entry.followUpRecord) === group.state)
+            .sort((left, right) => {
+              const priorityOrder = getTaskPriorityScore(right) - getTaskPriorityScore(left);
+
+              if (priorityOrder !== 0) {
+                return priorityOrder;
+              }
+
+              return compareLatestTimeDesc(left.latestRetrievedAt, right.latestRetrievedAt);
+            })
             .slice(0, 5);
 
           return (
@@ -353,7 +426,10 @@ function renderEventTags(event: FollowUpEvent, t: ReturnType<typeof useTranslati
   ].filter(Boolean);
 
   return tags.map((tag) => (
-    <Tag key={`${event.id}-${tag}`} color={tag === t("follow_ups.values.reminder_completed") ? "green" : undefined}>
+    <Tag
+      key={`${event.id}-${tag}`}
+      color={tag === t("follow_ups.values.reminder_completed") ? "green" : undefined}
+    >
       {tag}
     </Tag>
   ));
@@ -453,20 +529,7 @@ function FollowUpCompanyCard({
   }
 
   function getQuickValues(nextValues: Partial<FollowUpFormValues>): FollowUpFormValues {
-    return {
-      stage: record?.stage ?? entry.stage,
-      owner: record?.owner ?? "",
-      communicationMethod: record?.communicationMethod ?? "",
-      contactResult: record?.contactResult ?? "",
-      nextAction: record?.nextAction ?? "",
-      dealStage: record?.dealStage ?? "",
-      nextReminderAt: record?.nextReminderAt ?? "",
-      reminderStatus: record?.reminderStatus ?? "open",
-      completedAt: record?.completedAt ?? "",
-      note: record?.note ?? "",
-      lastFollowedAt: record?.lastFollowedAt ?? "",
-      ...nextValues,
-    };
+    return createFollowUpValues(entry, nextValues);
   }
 
   async function handleQuickSave(nextValues: Partial<FollowUpFormValues>, successMessage: string) {
@@ -661,7 +724,9 @@ function FollowUpCompanyCard({
           </Typography.Text>
         </div>
         <div className="rounded-[1rem] bg-(--color-card-soft) p-3">
-          <Typography.Text type="secondary">{t("follow_ups.fields.reminder_status")}</Typography.Text>
+          <Typography.Text type="secondary">
+            {t("follow_ups.fields.reminder_status")}
+          </Typography.Text>
           <Typography.Text strong className="block">
             {record?.reminderStatus === "completed"
               ? t("follow_ups.values.reminder_completed")
@@ -871,12 +936,15 @@ export function FollowUpManagementPanel({
   onSaveRecord: (record: FollowUpRecord) => void;
 }) {
   const { t } = useTranslation();
+  const [messageApi, contextHolder] = message.useMessage();
   const [filters, setFilters] = useState<FollowUpFilterState>({
     reminderState: "all",
     owner: "",
     stage: "all",
     contactResult: "all",
   });
+  const [batchOwner, setBatchOwner] = useState("");
+  const [isBatchSaving, setIsBatchSaving] = useState(false);
   const boardEntries = useMemo<FollowUpBoardEntry[]>(() => {
     const recordMap = new Map(records.map((record) => [record.companyId, record]));
 
@@ -926,6 +994,12 @@ export function FollowUpManagementPanel({
         };
       })
       .sort((left, right) => {
+        const taskOrder = getTaskPriorityScore(right) - getTaskPriorityScore(left);
+
+        if (taskOrder !== 0) {
+          return taskOrder;
+        }
+
         const stageOrder = right.stageScore - left.stageScore;
 
         if (stageOrder !== 0) {
@@ -944,6 +1018,9 @@ export function FollowUpManagementPanel({
   const priorityEntries = filteredEntries.filter((entry) => entry.stage === "priority");
   const watchEntries = filteredEntries.filter((entry) => entry.stage === "watch");
   const screeningEntries = filteredEntries.filter((entry) => entry.stage === "screening");
+  const interestedCount = boardEntries.filter(
+    (entry) => entry.followUpRecord?.contactResult === "interested"
+  ).length;
   const unassignedCount = boardEntries.filter((entry) => !entry.followUpRecord?.owner).length;
   const assignedCount = records.filter((record) => record.owner).length;
   const hasFollowUpRecords = records.length > 0;
@@ -969,8 +1046,50 @@ export function FollowUpManagementPanel({
     });
   }
 
+  async function batchAssignOwner() {
+    const owner = batchOwner.trim();
+
+    if (!owner) {
+      messageApi.warning(t("follow_ups.messages.owner_required"));
+      return;
+    }
+
+    if (!filteredEntries.length) {
+      messageApi.warning(t("follow_ups.messages.batch_empty"));
+      return;
+    }
+
+    setIsBatchSaving(true);
+
+    try {
+      const savedRecords = await Promise.all(
+        filteredEntries.map((entry) =>
+          saveFollowUpRecord(entry, createFollowUpValues(entry, { owner }))
+        )
+      );
+
+      for (const record of savedRecords) {
+        onSaveRecord(record);
+      }
+
+      messageApi.success(
+        t("follow_ups.messages.batch_assigned", {
+          count: savedRecords.length,
+          owner,
+        })
+      );
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : t("follow_ups.messages.batch_failed")
+      );
+    } finally {
+      setIsBatchSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {contextHolder}
       <Card>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl space-y-2">
@@ -998,26 +1117,62 @@ export function FollowUpManagementPanel({
           label={t("follow_ups.metrics.today")}
           value={reminderStats.today}
           detail={t("follow_ups.metrics.today_detail")}
+          active={filters.reminderState === "today"}
+          onClick={() => updateFilter({ reminderState: "today" })}
         />
         <MetricCard
           icon={<ClockCircleOutlined />}
           label={t("follow_ups.metrics.overdue")}
           value={reminderStats.overdue}
           detail={t("follow_ups.metrics.overdue_detail")}
+          active={filters.reminderState === "overdue"}
+          onClick={() => updateFilter({ reminderState: "overdue" })}
         />
         <MetricCard
           icon={<CheckCircleOutlined />}
           label={t("follow_ups.metrics.completed")}
           value={reminderStats.completed}
           detail={t("follow_ups.metrics.completed_detail")}
+          active={filters.reminderState === "completed"}
+          onClick={() => updateFilter({ reminderState: "completed" })}
         />
         <MetricCard
           icon={<SafetyCertificateOutlined />}
           label={t("follow_ups.metrics.unassigned")}
           value={unassignedCount}
           detail={t("follow_ups.metrics.unassigned_detail")}
+          active={filters.owner === "__unassigned"}
+          onClick={() => updateFilter({ owner: "__unassigned" })}
         />
       </div>
+
+      <Card>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <Typography.Text strong>{t("follow_ups.quick_filters.title")}</Typography.Text>
+            <Typography.Paragraph type="secondary" style={{ marginTop: 6, marginBottom: 0 }}>
+              {t("follow_ups.quick_filters.description")}
+            </Typography.Paragraph>
+          </div>
+          <Space wrap size={[8, 8]}>
+            <Button onClick={() => updateFilter({ reminderState: "overdue" })}>
+              {t("follow_ups.quick_filters.overdue")}
+            </Button>
+            <Button onClick={() => updateFilter({ reminderState: "today" })}>
+              {t("follow_ups.quick_filters.today")}
+            </Button>
+            <Button onClick={() => updateFilter({ contactResult: "interested" })}>
+              {t("follow_ups.quick_filters.interested", { count: interestedCount })}
+            </Button>
+            <Button onClick={() => updateFilter({ stage: "priority" })}>
+              {t("follow_ups.quick_filters.priority")}
+            </Button>
+            <Button onClick={() => updateFilter({ owner: "__unassigned" })}>
+              {t("follow_ups.quick_filters.unassigned", { count: unassignedCount })}
+            </Button>
+          </Space>
+        </div>
+      </Card>
 
       <FollowUpTaskBoard
         entries={boardEntries}
@@ -1042,6 +1197,7 @@ export function FollowUpManagementPanel({
             onChange={(value) => updateFilter({ owner: value })}
             options={[
               { value: "", label: t("follow_ups.filters.all_owners") },
+              { value: "__unassigned", label: t("follow_ups.filters.unassigned_owner") },
               ...ownerOptions.map((owner) => ({ value: owner, label: owner })),
             ]}
           />
@@ -1070,12 +1226,29 @@ export function FollowUpManagementPanel({
             {t("follow_ups.filters.reset")}
           </Button>
         </div>
-        <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
-          {t("follow_ups.filters.result", {
-            count: filteredEntries.length,
-            total: boardEntries.length,
-          })}
-        </Typography.Paragraph>
+        <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            {t("follow_ups.filters.result", {
+              count: filteredEntries.length,
+              total: boardEntries.length,
+            })}
+          </Typography.Paragraph>
+          <Space.Compact className="w-full xl:max-w-[28rem]">
+            <Input
+              value={batchOwner}
+              onChange={(event) => setBatchOwner(event.target.value)}
+              placeholder={t("follow_ups.batch.owner_placeholder")}
+            />
+            <Button
+              type="primary"
+              loading={isBatchSaving}
+              disabled={!filteredEntries.length}
+              onClick={() => void batchAssignOwner()}
+            >
+              {t("follow_ups.batch.assign_current")}
+            </Button>
+          </Space.Compact>
+        </div>
       </Card>
 
       {filteredEntries.length ? (

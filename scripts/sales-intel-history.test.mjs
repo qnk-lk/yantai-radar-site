@@ -81,6 +81,8 @@ test("sales intel feed keeps full aggregate history while today highlights stay 
   const aggregatePayload = JSON.parse(await readFile(aggregatePath, "utf-8"));
   assert.equal(aggregatePayload.leads.length, 10);
   assert.equal(aggregatePayload.allLeads.length, 12);
+  aggregatePayload.updatedAt = "2026-04-28 09:30:00 CST";
+  await writeFile(aggregatePath, `${JSON.stringify(aggregatePayload, null, 2)}\n`, "utf-8");
 
   await execFileAsync(
     "node",

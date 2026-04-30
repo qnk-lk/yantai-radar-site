@@ -1,8 +1,4 @@
-import type {
-  FollowUpContactResult,
-  FollowUpRecord,
-  FollowUpStage,
-} from "./follow-up-types";
+import type { FollowUpContactResult, FollowUpRecord, FollowUpStage } from "./follow-up-types";
 
 export type FollowUpReminderState = "all" | "today" | "overdue" | "unset" | "completed";
 
@@ -115,11 +111,18 @@ export function filterFollowUpEntries<TEntry extends FollowUpFilterEntry>(
   return entries.filter((entry) => {
     const record = entry.followUpRecord;
 
-    if (filters.reminderState !== "all" && getReminderState(record, now) !== filters.reminderState) {
+    if (
+      filters.reminderState !== "all" &&
+      getReminderState(record, now) !== filters.reminderState
+    ) {
       return false;
     }
 
-    if (filters.owner && record?.owner !== filters.owner) {
+    if (filters.owner === "__unassigned" && record?.owner) {
+      return false;
+    }
+
+    if (filters.owner && filters.owner !== "__unassigned" && record?.owner !== filters.owner) {
       return false;
     }
 

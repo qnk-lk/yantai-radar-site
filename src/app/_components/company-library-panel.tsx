@@ -23,6 +23,7 @@ import {
   Tag,
   Typography,
 } from "antd";
+import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -451,9 +452,18 @@ function CompanyIndexItem({
   const { t } = useTranslation();
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+
+        event.preventDefault();
+        onSelect();
+      }}
       className={`w-full rounded-[1.35rem] border bg-white/80 px-4 py-4 text-left shadow-[0_12px_34px_rgba(69,49,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white ${
         active ? "border-(--color-accent)" : "border-(--color-line)"
       }`}
@@ -479,8 +489,15 @@ function CompanyIndexItem({
             ? `${t("entry.retrieved_at")} ${formatDisplayUpdatedAt(entry.latestRetrievedAt)}`
             : t("sales_intel.not_synced")}
         </Typography.Text>
+        <Link
+          href={`/company-detail?company=${encodeURIComponent(entry.id)}`}
+          onClick={(event) => event.stopPropagation()}
+          className="w-fit rounded-full border border-(--color-line) px-3 py-1 text-xs font-semibold text-(--color-accent) hover:bg-(--color-card-soft)"
+        >
+          {t("companies.open_detail")}
+        </Link>
       </Space>
-    </button>
+    </div>
   );
 }
 
@@ -1032,6 +1049,9 @@ function CompanyProfile({
                 </Typography.Paragraph>
               </div>
             </div>
+            <Link href={`/company-detail?company=${encodeURIComponent(entry.id)}`}>
+              <Button type="primary">{t("companies.open_detail")}</Button>
+            </Link>
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
