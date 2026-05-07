@@ -157,7 +157,7 @@ test("buildOverviewStatsPayload returns quality, follow-up, and report metrics",
     assert.equal(payload.quality.untouched, 2);
     assert.equal(payload.followUps.total, 1);
     assert.equal(payload.followUps.assigned, 1);
-    assert.equal(payload.followUps.today, 1);
+    assert.equal(payload.followUps.open, 1);
     assert.equal(payload.reports.totals.signals, 3);
     assert.equal(payload.reports.platformContribution[0].label, "智联招聘");
     assert.equal(payload.reports.conversion.signalToActionRate, 33);

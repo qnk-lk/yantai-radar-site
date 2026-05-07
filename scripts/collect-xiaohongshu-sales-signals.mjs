@@ -27,8 +27,7 @@ const XIAOHONGSHU_BASE_URL = "https://www.xiaohongshu.com";
 
 const BLOCKED_PATTERN =
   /登录|请登录|验证码|异常访问|安全验证|继续访问请登录|security-check|captcha/i;
-const CONTACT_LINE_PATTERN =
-  /微信|vx|v信|手机号|电话|邮箱|扫码|私信我|联系我|加我|加微信|留电话/i;
+const CONTACT_LINE_PATTERN = /微信|vx|v信|手机号|电话|邮箱|扫码|私信我|联系我|加我|加微信|留电话/i;
 const RECRUITMENT_PATTERN = /招聘|岗位|实施顾问|工程师|内推|招人|hr|HR|实施岗/i;
 const NEED_PATTERN =
   /准备上|正在上|求推荐|求介绍|上线|改造|选型|实施|落地|对接|打通|换系统|上mes|上wms|上qms/i;
@@ -163,6 +162,32 @@ function normalizeOptionalPath(filePath) {
   }
 
   return path.isAbsolute(filePath) ? filePath : path.resolve(projectRoot, filePath);
+}
+
+function resolveSessionInfo(sessionPayload) {
+  const cookies = Array.isArray(sessionPayload?.cookies) ? sessionPayload.cookies : [];
+  const expiryCandidates = cookies
+    .map((cookie) =>
+      typeof cookie?.expires === "number" && Number.isFinite(cookie.expires) && cookie.expires > 0
+        ? cookie.expires * 1000
+        : 0
+    )
+    .filter(Boolean);
+  const expiryTime = expiryCandidates.length ? Math.max(...expiryCandidates) : 0;
+  const sessionExpiresAt = expiryTime ? new Date(expiryTime).toISOString() : "";
+
+  return {
+    sessionFileConfigured: Boolean(sessionPayload),
+    sessionExportedAt: sanitizeText(sessionPayload?.exportedAt || "", 40),
+    sessionExpiresAt,
+    authMode: sessionPayload ? "session_file" : "browser_context",
+    authState:
+      sessionPayload && sessionExpiresAt && expiryTime <= Date.now()
+        ? "expired"
+        : sessionPayload
+          ? "loaded"
+          : "browser_only",
+  };
 }
 
 function getShanghaiUpdatedAt() {
@@ -357,8 +382,7 @@ function classifySignal({
 
   let signalType = "行业情报";
   let signalCategory = "制造业数字化主题";
-  let inferredNeed =
-    "笔记围绕 MES/WMS/QMS 或制造业数字化展开，可作为销售跟进时的行业侧证据。";
+  let inferredNeed = "笔记围绕 MES/WMS/QMS 或制造业数字化展开，可作为销售跟进时的行业侧证据。";
 
   if (RECRUITMENT_PATTERN.test(text)) {
     signalType = "招聘信号";
@@ -366,12 +390,10 @@ function classifySignal({
       "笔记直接涉及 MES/WMS/QMS 岗位、实施顾问或招聘讨论，说明相关组织存在招人或交付扩张信号。";
   } else if (NEED_PATTERN.test(text)) {
     signalType = "需求信号";
-    inferredNeed =
-      "笔记直接出现上系统、求推荐、改造、上线或选型等表达，说明存在制造业数字化需求。";
+    inferredNeed = "笔记直接出现上系统、求推荐、改造、上线或选型等表达，说明存在制造业数字化需求。";
   } else if (INTEL_PATTERN.test(text)) {
     signalType = "行业情报";
-    inferredNeed =
-      "笔记包含价格、实施、避坑或市场反馈，可作为销售沟通和方案包装时的外围情报。";
+    inferredNeed = "笔记包含价格、实施、避坑或市场反馈，可作为销售沟通和方案包装时的外围情报。";
   }
 
   if (companyName) {
@@ -419,11 +441,7 @@ function createSignal(detail, rank, keywordSet, retrievedAt) {
     `${noteTitle} ${description} ${discussionPreview} ${detail.authorName}`
   );
   const sourceText = `${noteTitle} ${description} ${discussionPreview} ${detail.authorName}`;
-  const matchedKeywords = [
-    ...new Set(
-      findKeywordHits(sourceText, keywordSet)
-    ),
-  ].slice(0, 10);
+  const matchedKeywords = [...new Set(findKeywordHits(sourceText, keywordSet))].slice(0, 10);
   const classification = classifySignal({
     noteTitle,
     description,
@@ -522,7 +540,15 @@ function createSignal(detail, rank, keywordSet, retrievedAt) {
   };
 }
 
-function buildPayload({ signals, leads, queries, maxSignals, platformStatus, queryLogs }) {
+function buildPayload({
+  signals,
+  leads,
+  queries,
+  maxSignals,
+  platformStatus,
+  queryLogs,
+  browserMeta,
+}) {
   const effectiveSignalCount = signals.length;
   return {
     updatedAt: getShanghaiUpdatedAt(),
@@ -539,6 +565,14 @@ function buildPayload({ signals, leads, queries, maxSignals, platformStatus, que
         querySummary: queryLogs.join("；"),
         effectiveSignalCount,
         effectiveCompanyCount: effectiveSignalCount,
+        browserEndpoint: browserMeta.browserEndpoint,
+        browserMode: "cdp",
+        browserClosed: browserMeta.browserClosed,
+        sessionFileConfigured: browserMeta.sessionFileConfigured,
+        sessionExportedAt: browserMeta.sessionExportedAt,
+        sessionExpiresAt: browserMeta.sessionExpiresAt,
+        authMode: browserMeta.authMode,
+        authState: platformStatus === "blocked" ? "blocked" : browserMeta.authState,
         note:
           platformStatus === "ok"
             ? "通过浏览器登录态读取小红书搜索卡片与笔记详情。"
@@ -576,7 +610,7 @@ class CdpClient {
 
   async closeTarget() {
     if (!this.targetId) {
-      return;
+      return true;
     }
 
     const endpoint = `${this.debugUrl}/json/close/${this.targetId}`;
@@ -585,8 +619,10 @@ class CdpClient {
       if (!response.ok) {
         response = await fetch(endpoint);
       }
+      return response.ok;
     } catch {
       // Ignore close failures so the main run result is preserved.
+      return false;
     } finally {
       this.targetId = "";
     }
@@ -743,7 +779,7 @@ class CdpClient {
       this.ws?.close();
     } finally {
       this.ws = null;
-      await this.closeTarget();
+      return await this.closeTarget();
     }
   }
 }
@@ -890,7 +926,11 @@ async function collectSearchCandidates(cdp, options, keywordSet) {
     candidates,
     queryLogs,
     platformStatus:
-      blockedCount > 0 && candidates.length === 0 ? "blocked" : candidates.length > 0 ? "ok" : "limited",
+      blockedCount > 0 && candidates.length === 0
+        ? "blocked"
+        : candidates.length > 0
+          ? "ok"
+          : "limited",
   };
 }
 
@@ -956,7 +996,12 @@ async function collectSignals(cdp, options) {
       continue;
     }
 
-    const { signal, lead } = createSignal(mergedDetail, signals.length + 1, keywordSet, retrievedAt);
+    const { signal, lead } = createSignal(
+      mergedDetail,
+      signals.length + 1,
+      keywordSet,
+      retrievedAt
+    );
     if (objectMentionsExcludedEntity(signal) || objectMentionsExcludedEntity(lead)) {
       continue;
     }
@@ -984,14 +1029,31 @@ async function main() {
   const outputPath = normalizeOutputPath(options.output);
   const sessionFilePath = normalizeOptionalPath(options.sessionFile);
   const cdp = new CdpClient(options.debugUrl);
+  let sessionPayload = null;
+  let payload = null;
 
   try {
     await cdp.connect();
     if (sessionFilePath) {
-      const sessionPayload = JSON.parse(await fs.readFile(sessionFilePath, "utf-8"));
+      sessionPayload = JSON.parse(await fs.readFile(sessionFilePath, "utf-8"));
       await cdp.loadCookies(sessionPayload.cookies);
     }
-    const payload = await collectSignals(cdp, options);
+    payload = await collectSignals(cdp, options);
+    const browserClosed = await cdp.dispose();
+    const sessionInfo = resolveSessionInfo(sessionPayload);
+    payload = buildPayload({
+      signals: payload.signals,
+      leads: payload.leads,
+      queries: options.queries,
+      maxSignals: options.maxSignals,
+      platformStatus: payload.platformCoverage?.[0]?.status || "limited",
+      queryLogs: payload.platformCoverage?.[0]?.querySummary?.split("；").filter(Boolean) || [],
+      browserMeta: {
+        browserEndpoint: options.debugUrl,
+        browserClosed,
+        ...sessionInfo,
+      },
+    });
 
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
@@ -1009,7 +1071,9 @@ async function main() {
     );
     process.exitCode = 1;
   } finally {
-    await cdp.dispose();
+    if (!payload) {
+      await cdp.dispose();
+    }
   }
 }
 

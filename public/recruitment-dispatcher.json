@@ -1,0 +1,24 @@
+{
+  "updatedAt": "等待首次自动同步",
+  "status": "waiting",
+  "startedAt": "",
+  "finishedAt": "",
+  "stopReason": "等待招聘平台统一调度器首次执行。",
+  "strategy": {
+    "platformLimit": 3,
+    "leadLimit": 10,
+    "platformCandidateLimit": 8,
+    "selectedPlatforms": [],
+    "candidatePlatforms": []
+  },
+  "totals": {
+    "attemptedPlatforms": 0,
+    "successfulPlatforms": 0,
+    "failedPlatforms": 0,
+    "blockedPlatforms": 0,
+    "totalLeads": 0,
+    "newLeadCount": 0,
+    "duplicateLeadCount": 0
+  },
+  "attempts": []
+}

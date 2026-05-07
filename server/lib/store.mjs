@@ -56,6 +56,9 @@ export const DOCUMENT_DEFINITIONS = {
   recruitmentLeads: {
     fileName: "recruitment-leads.json",
   },
+  recruitmentDispatcher: {
+    fileName: "recruitment-dispatcher.json",
+  },
   adminDivisions: {
     fileName: "china-admin-divisions.json",
   },

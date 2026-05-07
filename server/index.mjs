@@ -1079,6 +1079,20 @@ function buildApp(config, db) {
     return document.payload;
   });
 
+  app.get("/api/recruitment/dispatcher", async (_request, reply) => {
+    const document = readDocument(db, "recruitmentDispatcher");
+
+    if (!document) {
+      reply.code(404);
+      return {
+        ok: false,
+        message: "Recruitment dispatcher data not found",
+      };
+    }
+
+    return document.payload;
+  });
+
   app.get("/api/admin/divisions", async (_request, reply) => {
     const document = readDocument(db, "adminDivisions");
 

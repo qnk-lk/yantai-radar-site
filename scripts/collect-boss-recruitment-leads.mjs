@@ -187,6 +187,32 @@ function normalizeOptionalPath(filePath) {
   return path.isAbsolute(filePath) ? filePath : path.resolve(projectRoot, filePath);
 }
 
+function resolveSessionInfo(sessionPayload) {
+  const cookies = Array.isArray(sessionPayload?.cookies) ? sessionPayload.cookies : [];
+  const expiryCandidates = cookies
+    .map((cookie) =>
+      typeof cookie?.expires === "number" && Number.isFinite(cookie.expires) && cookie.expires > 0
+        ? cookie.expires * 1000
+        : 0
+    )
+    .filter(Boolean);
+  const expiryTime = expiryCandidates.length ? Math.max(...expiryCandidates) : 0;
+  const sessionExpiresAt = expiryTime ? new Date(expiryTime).toISOString() : "";
+
+  return {
+    sessionFileConfigured: Boolean(sessionPayload),
+    sessionExportedAt: sanitizeText(sessionPayload?.exportedAt || "", 40),
+    sessionExpiresAt,
+    authMode: sessionPayload ? "session_file" : "browser_context",
+    authState:
+      sessionPayload && sessionExpiresAt && expiryTime <= Date.now()
+        ? "expired"
+        : sessionPayload
+          ? "loaded"
+          : "browser_only",
+  };
+}
+
 function normalizeCompanyName(value) {
   return sanitizeText(value, 120)
     .replace(/[\s()（）[\]【】]/g, "")
@@ -260,7 +286,9 @@ function mergeCollectedJobs(previousJobs, currentJobs, fallbackPlatform, fallbac
       salary: normalizedJob.salary || existingJob.salary,
       publishedAt: normalizedJob.publishedAt || existingJob.publishedAt,
       url: normalizedJob.url || existingJob.url,
-      keywordHits: [...new Set([...(existingJob.keywordHits || []), ...(normalizedJob.keywordHits || [])])],
+      keywordHits: [
+        ...new Set([...(existingJob.keywordHits || []), ...(normalizedJob.keywordHits || [])]),
+      ],
       descriptionEvidence: normalizedJob.descriptionEvidence || existingJob.descriptionEvidence,
     });
   }
@@ -491,7 +519,15 @@ function mergeLead(lead, job, detail, keywordSet) {
   lead.leadStrength = buildLeadStrength(lead.matchedKeywords, jobTitle, description);
 }
 
-function buildPayload({ leads, cities, keywords, maxCompanies, platformStatus, queryLogs }) {
+function buildPayload({
+  leads,
+  cities,
+  keywords,
+  maxCompanies,
+  platformStatus,
+  queryLogs,
+  browserMeta,
+}) {
   const effectiveCompanyCount = leads.length;
   return {
     updatedAt: getShanghaiUpdatedAt(),
@@ -510,6 +546,14 @@ function buildPayload({ leads, cities, keywords, maxCompanies, platformStatus, q
         status: platformStatus,
         querySummary: queryLogs.join("；"),
         effectiveCompanyCount,
+        browserEndpoint: browserMeta.browserEndpoint,
+        browserMode: "cdp",
+        browserClosed: browserMeta.browserClosed,
+        sessionFileConfigured: browserMeta.sessionFileConfigured,
+        sessionExportedAt: browserMeta.sessionExportedAt,
+        sessionExpiresAt: browserMeta.sessionExpiresAt,
+        authMode: browserMeta.authMode,
+        authState: platformStatus === "blocked" ? "blocked" : browserMeta.authState,
         note:
           platformStatus === "ok"
             ? "通过本机已登录真实 Chrome 读取公开岗位和职位详情。"
@@ -546,7 +590,7 @@ class CdpClient {
 
   async closeTarget() {
     if (!this.targetId) {
-      return;
+      return true;
     }
 
     const endpoint = `${this.debugUrl}/json/close/${this.targetId}`;
@@ -555,8 +599,10 @@ class CdpClient {
       if (!response.ok) {
         response = await fetch(endpoint);
       }
+      return response.ok;
     } catch {
       // Ignore close failures so the main run result is preserved.
+      return false;
     } finally {
       this.targetId = "";
     }
@@ -661,7 +707,10 @@ class CdpClient {
   async loadCookies(cookies) {
     const filteredCookies = Array.isArray(cookies)
       ? cookies
-          .filter((cookie) => cookie && typeof cookie.name === "string" && typeof cookie.value === "string")
+          .filter(
+            (cookie) =>
+              cookie && typeof cookie.name === "string" && typeof cookie.value === "string"
+          )
           .map((cookie) => {
             const value = {
               name: cookie.name,
@@ -676,7 +725,11 @@ class CdpClient {
               value.sameSite = cookie.sameSite;
             }
 
-            if (typeof cookie.expires === "number" && Number.isFinite(cookie.expires) && cookie.expires > 0) {
+            if (
+              typeof cookie.expires === "number" &&
+              Number.isFinite(cookie.expires) &&
+              cookie.expires > 0
+            ) {
               value.expires = cookie.expires;
             }
 
@@ -701,7 +754,7 @@ class CdpClient {
       this.ws?.close();
     } finally {
       this.ws = null;
-      await this.closeTarget();
+      return await this.closeTarget();
     }
   }
 }
@@ -969,14 +1022,32 @@ async function main() {
   const outputPath = normalizeOutputPath(options.output);
   const sessionFilePath = normalizeOptionalPath(options.sessionFile);
   const cdp = new CdpClient(options.debugUrl);
+  let sessionPayload = null;
+  let payload = null;
 
   try {
     await cdp.connect();
     if (sessionFilePath) {
-      const sessionPayload = JSON.parse(await fs.readFile(sessionFilePath, "utf-8"));
+      sessionPayload = JSON.parse(await fs.readFile(sessionFilePath, "utf-8"));
       await cdp.loadCookies(sessionPayload.cookies);
     }
-    const payload = await collectLeads(cdp, options);
+    payload = await collectLeads(cdp, options);
+
+    const browserClosed = await cdp.dispose();
+    const sessionInfo = resolveSessionInfo(sessionPayload);
+    payload = buildPayload({
+      leads: payload.leads,
+      cities: options.cities,
+      keywords: options.keywords,
+      maxCompanies: options.maxCompanies,
+      platformStatus: payload.platformCoverage?.[0]?.status || "limited",
+      queryLogs: payload.platformCoverage?.[0]?.querySummary?.split("；").filter(Boolean) || [],
+      browserMeta: {
+        browserEndpoint: options.debugUrl,
+        browserClosed,
+        ...sessionInfo,
+      },
+    });
 
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
@@ -990,7 +1061,9 @@ async function main() {
     );
     process.exitCode = 1;
   } finally {
-    await cdp.dispose();
+    if (!payload) {
+      await cdp.dispose();
+    }
   }
 }
 

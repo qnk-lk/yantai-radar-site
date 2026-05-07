@@ -8,6 +8,7 @@ LEAD_LIMIT="${LEAD_LIMIT:-10}"
 PLATFORM_CANDIDATE_LIMIT="${PLATFORM_CANDIDATE_LIMIT:-8}"
 KEYWORDS="${KEYWORDS:-MES,WMS,QMS,智能制造}"
 AGGREGATE_OUTPUT="${AGGREGATE_OUTPUT:-/var/www/qn-message.com/recruitment-leads-aggregate.json}"
+DISPATCHER_OUTPUT="${DISPATCHER_OUTPUT:-/var/www/qn-message.com/recruitment-dispatcher.json}"
 RADAR_LATEST_INPUT="${RADAR_LATEST_INPUT:-/var/www/qn-message.com/latest.json}"
 SALES_INTEL_OUTPUT="${SALES_INTEL_OUTPUT:-/var/www/qn-message.com/sales-intel.json}"
 
@@ -30,18 +31,29 @@ PLATFORMS=(
 )
 
 {
+  run_started_at="$(timestamp)"
+  dispatcher_status="completed"
+  stop_reason="platform_limit_completed"
+  attempt_lines=()
+
   echo "[$(timestamp)] recruitment dispatcher started"
   echo "platform limit: $PLATFORM_LIMIT"
   echo "platform candidate limit: $PLATFORM_CANDIDATE_LIMIT"
   echo "lead limit: $LEAD_LIMIT"
 
   mapfile -t SELECTED_PLATFORMS < <(printf '%s\n' "${PLATFORMS[@]}" | shuf)
+  candidate_names=()
+  for entry in "${SELECTED_PLATFORMS[@]}"; do
+    IFS='|' read -r platform_name _runner _output <<<"$entry"
+    candidate_names+=("$platform_name")
+  done
 
   total_leads=0
   selected_names=()
   for index in "${!SELECTED_PLATFORMS[@]}"; do
     if (( index >= PLATFORM_LIMIT && total_leads >= LEAD_LIMIT )); then
       echo "lead limit reached after $index platform(s)"
+      stop_reason="lead_limit_reached"
       break
     fi
 
@@ -68,6 +80,7 @@ PLATFORMS=(
       candidate_limit="$LEAD_LIMIT"
     fi
 
+    attempt_started_at="$(timestamp)"
     echo "[$(timestamp)] running $platform_name with candidate limit $candidate_limit and remaining target $remaining"
     if SKIP_SALES_INTEL_SYNC=1 MAX_COMPANIES="$candidate_limit" KEYWORDS="$KEYWORDS" bash "$runner_script"; then
       if [[ -f "$output_file" ]]; then
@@ -78,9 +91,16 @@ PLATFORMS=(
 
       total_leads=$((total_leads + lead_count))
       selected_names+=("$platform_name")
+      attempt_lines+=("${platform_name}\tok\t${lead_count}\t${candidate_limit}\t${attempt_started_at}\t$(timestamp)\t服务器调度执行成功")
       echo "[$(timestamp)] $platform_name completed with $lead_count leads; total=$total_leads"
     else
       rc=$?
+      dispatcher_status="partial"
+      if [[ $rc -eq 3 ]]; then
+        attempt_lines+=("${platform_name}\tblocked\t0\t${candidate_limit}\t${attempt_started_at}\t$(timestamp)\t登录态失效或触发校验")
+      else
+        attempt_lines+=("${platform_name}\terror\t0\t${candidate_limit}\t${attempt_started_at}\t$(timestamp)\t执行失败，请查看平台日志")
+      fi
       echo "[$(timestamp)] $platform_name failed with exit code $rc"
     fi
   done
@@ -98,6 +118,33 @@ PLATFORMS=(
     SALES_INTEL_OUTPUT="$SALES_INTEL_OUTPUT" \
     bash "$PROJECT_ROOT/scripts/server-refresh-sales-intel.sh"
   fi
+
+  if (( total_leads <= 0 && ${#selected_names[@]} == 0 )); then
+    dispatcher_status="failed"
+    stop_reason="no_platform_succeeded"
+  elif [[ "$stop_reason" != "lead_limit_reached" ]]; then
+    stop_reason="platform_limit_completed"
+  fi
+
+  ATTEMPT_LINES="$(printf '%s\n' "${attempt_lines[@]}")" \
+  node "$PROJECT_ROOT/scripts/write-recruitment-dispatcher-status.mjs" \
+    --output "$DISPATCHER_OUTPUT" \
+    --aggregate "$AGGREGATE_OUTPUT" \
+    --status "$dispatcher_status" \
+    --started-at "$run_started_at" \
+    --finished-at "$(timestamp)" \
+    --stop-reason "$stop_reason" \
+    --platform-limit "$PLATFORM_LIMIT" \
+    --lead-limit "$LEAD_LIMIT" \
+    --platform-candidate-limit "$PLATFORM_CANDIDATE_LIMIT" \
+    --total-leads "$total_leads" \
+    --selected-platforms "$(IFS=,; echo "${selected_names[*]}")" \
+    --candidate-platforms "$(IFS=,; echo "${candidate_names[*]}")"
+
+  node "$PROJECT_ROOT/server/import-document.mjs" \
+    --key recruitmentDispatcher \
+    --input "$DISPATCHER_OUTPUT" \
+    --source "recruitment-dispatcher"
 
   echo "[$(timestamp)] recruitment dispatcher completed"
 } >>"$LOG_FILE" 2>&1

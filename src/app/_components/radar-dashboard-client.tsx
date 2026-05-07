@@ -95,6 +95,14 @@ type RecruitmentPlatformCoverage = {
   logPath?: string;
   note?: string;
   updatedAt?: string;
+  browserEndpoint?: string;
+  browserMode?: string;
+  browserClosed?: boolean;
+  sessionFileConfigured?: boolean;
+  sessionExportedAt?: string;
+  sessionExpiresAt?: string;
+  authMode?: string;
+  authState?: string;
 };
 
 type RecruitmentLeadsPayload = {
@@ -109,6 +117,41 @@ type RecruitmentLeadsPayload = {
     leadLimit?: number;
   };
   platformCoverage?: RecruitmentPlatformCoverage[];
+};
+
+type RecruitmentDispatcherAttempt = {
+  platform: string;
+  status: string;
+  leadCount?: number;
+  candidateLimit?: number;
+  startedAt?: string;
+  finishedAt?: string;
+  note?: string;
+};
+
+type RecruitmentDispatcherPayload = {
+  updatedAt?: string;
+  status?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  stopReason?: string;
+  strategy?: {
+    platformLimit?: number;
+    leadLimit?: number;
+    platformCandidateLimit?: number;
+    selectedPlatforms?: string[];
+    candidatePlatforms?: string[];
+  };
+  totals?: {
+    attemptedPlatforms?: number;
+    successfulPlatforms?: number;
+    failedPlatforms?: number;
+    blockedPlatforms?: number;
+    totalLeads?: number;
+    newLeadCount?: number;
+    duplicateLeadCount?: number;
+  };
+  attempts?: RecruitmentDispatcherAttempt[];
 };
 
 type OverviewStatsPayload = {
@@ -289,6 +332,33 @@ function createFallbackRecruitmentLeadsData(): RecruitmentLeadsPayload {
   };
 }
 
+function createFallbackRecruitmentDispatcherData(): RecruitmentDispatcherPayload {
+  return {
+    updatedAt: "",
+    status: "waiting",
+    startedAt: "",
+    finishedAt: "",
+    stopReason: "",
+    strategy: {
+      platformLimit: 3,
+      leadLimit: 10,
+      platformCandidateLimit: 8,
+      selectedPlatforms: [],
+      candidatePlatforms: [],
+    },
+    totals: {
+      attemptedPlatforms: 0,
+      successfulPlatforms: 0,
+      failedPlatforms: 0,
+      blockedPlatforms: 0,
+      totalLeads: 0,
+      newLeadCount: 0,
+      duplicateLeadCount: 0,
+    },
+    attempts: [],
+  };
+}
+
 async function loadJson<T>(url: string): Promise<T> {
   const response = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
 
@@ -394,6 +464,24 @@ function getPlatformWrittenCount(item: RecruitmentPlatformCoverage) {
 
 function getPlatformLogText(item: RecruitmentPlatformCoverage) {
   return item.error || item.lastLog || item.note || item.logPath || "";
+}
+
+function getDispatcherStatusColor(status: string) {
+  const normalized = compactText(status).toLowerCase();
+
+  if (["completed", "ok", "success"].includes(normalized)) {
+    return "green";
+  }
+
+  if (["partial", "limited"].includes(normalized)) {
+    return "gold";
+  }
+
+  if (["failed", "error", "blocked"].includes(normalized)) {
+    return "red";
+  }
+
+  return "default";
 }
 
 function MetricCard({
@@ -1347,6 +1435,7 @@ function SourcesPanel({
   followUpRecords,
   companyProfiles,
   recruitmentLeadsData,
+  recruitmentDispatcherData,
   apiHealth,
   overviewStats,
 }: {
@@ -1355,6 +1444,7 @@ function SourcesPanel({
   followUpRecords: FollowUpRecord[];
   companyProfiles: CompanyProfileRecord[];
   recruitmentLeadsData: RecruitmentLeadsPayload;
+  recruitmentDispatcherData: RecruitmentDispatcherPayload;
   apiHealth: ApiHealthPayload | null;
   overviewStats: OverviewStatsPayload | null;
 }) {
@@ -1506,11 +1596,33 @@ function SourcesPanel({
       return <Tag color="red">{t("sources.platforms.status_failed")}</Tag>;
     }
 
+    if (["blocked"].includes(normalized)) {
+      return <Tag color="red">{t("sources.platforms.auth_expired")}</Tag>;
+    }
+
     if (["skipped", "disabled"].includes(normalized)) {
       return <Tag color="gold">{t("sources.platforms.status_skipped")}</Tag>;
     }
 
     return <Tag>{t("sources.platforms.status_waiting")}</Tag>;
+  }
+
+  function renderAuthStateTag(state: string) {
+    const normalized = compactText(state).toLowerCase();
+
+    if (["loaded", "public"].includes(normalized)) {
+      return <Tag color="green">{t("sources.platforms.auth_loaded")}</Tag>;
+    }
+
+    if (["browser_only"].includes(normalized)) {
+      return <Tag>{t("sources.platforms.auth_browser_only")}</Tag>;
+    }
+
+    if (["expired", "blocked"].includes(normalized)) {
+      return <Tag color="red">{t("sources.platforms.auth_expired")}</Tag>;
+    }
+
+    return <Tag>{t("sources.platforms.auth_unknown")}</Tag>;
   }
 
   return (
@@ -1640,6 +1752,122 @@ function SourcesPanel({
       </div>
 
       <Card
+        title={t("sources.dispatcher.title")}
+        extra={
+          <div className="flex flex-wrap items-center gap-2">
+            <Tag color={getDispatcherStatusColor(recruitmentDispatcherData.status || "")}>
+              {t(
+                `sources.dispatcher.statuses.${compactText(recruitmentDispatcherData.status || "waiting").toLowerCase()}`
+              )}
+            </Tag>
+            <Typography.Text type="secondary">
+              {recruitmentDispatcherData.updatedAt
+                ? formatDisplayUpdatedAt(recruitmentDispatcherData.updatedAt)
+                : t("sales_intel.not_synced")}
+            </Typography.Text>
+          </div>
+        }
+      >
+        <Typography.Paragraph type="secondary">
+          {t("sources.dispatcher.description")}
+        </Typography.Paragraph>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label={t("sources.dispatcher.attempted_platforms")}
+            value={recruitmentDispatcherData.totals?.attemptedPlatforms ?? 0}
+            detail={t("sources.dispatcher.attempted_platforms_detail")}
+          />
+          <MetricCard
+            label={t("sources.dispatcher.total_leads")}
+            value={recruitmentDispatcherData.totals?.totalLeads ?? 0}
+            detail={t("sources.dispatcher.total_leads_detail")}
+          />
+          <MetricCard
+            label={t("sources.dispatcher.new_leads")}
+            value={recruitmentDispatcherData.totals?.newLeadCount ?? 0}
+            detail={t("sources.dispatcher.new_leads_detail")}
+          />
+          <MetricCard
+            label={t("sources.dispatcher.blocked_platforms")}
+            value={recruitmentDispatcherData.totals?.blockedPlatforms ?? 0}
+            detail={t("sources.dispatcher.blocked_platforms_detail")}
+          />
+        </div>
+        <div className="mt-4 grid gap-3 rounded-[1.2rem] border border-(--color-line) bg-(--color-card-soft) p-4 lg:grid-cols-2">
+          <Typography.Text type="secondary">
+            {t("sources.dispatcher.started_at", {
+              value: recruitmentDispatcherData.startedAt
+                ? formatDisplayUpdatedAt(recruitmentDispatcherData.startedAt)
+                : t("sales_intel.not_synced"),
+            })}
+          </Typography.Text>
+          <Typography.Text type="secondary">
+            {t("sources.dispatcher.finished_at", {
+              value: recruitmentDispatcherData.finishedAt
+                ? formatDisplayUpdatedAt(recruitmentDispatcherData.finishedAt)
+                : t("sales_intel.not_synced"),
+            })}
+          </Typography.Text>
+          <Typography.Text type="secondary">
+            {t("sources.dispatcher.stop_reason", {
+              value: recruitmentDispatcherData.stopReason || t("sources.dispatcher.no_reason"),
+            })}
+          </Typography.Text>
+          <Typography.Text type="secondary">
+            {t("sources.dispatcher.selection", {
+              value:
+                recruitmentDispatcherData.strategy?.selectedPlatforms?.join("、") ||
+                t("sources.dispatcher.none_selected"),
+            })}
+          </Typography.Text>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {(recruitmentDispatcherData.attempts ?? []).length ? (
+            recruitmentDispatcherData.attempts?.map((item, index) => (
+              <div
+                key={`${item.platform}-${index}`}
+                className="rounded-[1.2rem] border border-(--color-line) bg-white/60 p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Typography.Text strong>{item.platform}</Typography.Text>
+                    {renderPlatformStatusTag(item.status || "")}
+                  </div>
+                  <Tag>
+                    {t("sources.dispatcher.candidate_limit", { count: item.candidateLimit ?? 0 })}
+                  </Tag>
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                  <Typography.Text type="secondary">
+                    {t("sources.dispatcher.lead_count", { count: item.leadCount ?? 0 })}
+                  </Typography.Text>
+                  <Typography.Text type="secondary">
+                    {t("sources.dispatcher.started_at", {
+                      value: item.startedAt
+                        ? formatDisplayUpdatedAt(item.startedAt)
+                        : t("sales_intel.not_synced"),
+                    })}
+                  </Typography.Text>
+                  <Typography.Text type="secondary">
+                    {t("sources.dispatcher.finished_at", {
+                      value: item.finishedAt
+                        ? formatDisplayUpdatedAt(item.finishedAt)
+                        : t("sales_intel.not_synced"),
+                    })}
+                  </Typography.Text>
+                </div>
+                <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                  {item.note || t("sources.dispatcher.no_note")}
+                </Typography.Paragraph>
+              </div>
+            ))
+          ) : (
+            <Empty description={t("sources.dispatcher.empty")} />
+          )}
+        </div>
+      </Card>
+
+      <Card
         title={t("sources.platforms.title")}
         extra={
           <Typography.Text type="secondary">
@@ -1691,6 +1919,45 @@ function SourcesPanel({
                     <Typography.Text type="secondary">
                       {t("sources.platforms.effective_count", {
                         count: item.effectiveCompanyCount ?? 0,
+                      })}
+                    </Typography.Text>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {renderAuthStateTag(item.authState || "")}
+                    <Tag>
+                      {item.browserClosed
+                        ? t("sources.platforms.browser_closed")
+                        : t("sources.platforms.browser_open")}
+                    </Tag>
+                    <Tag>
+                      {item.sessionFileConfigured
+                        ? t("sources.platforms.session_configured")
+                        : t("sources.platforms.session_not_required")}
+                    </Tag>
+                  </div>
+                  <div className="grid gap-2 rounded-[1rem] bg-(--color-card-soft) p-3 text-sm">
+                    <Typography.Text type="secondary">
+                      {t("sources.platforms.auth_mode", {
+                        value: item.authMode || t("sources.platforms.auth_unknown"),
+                      })}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      {t("sources.platforms.browser_endpoint", {
+                        value: item.browserEndpoint || t("sources.platforms.no_browser"),
+                      })}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      {t("sources.platforms.session_exported_at", {
+                        value: item.sessionExportedAt
+                          ? formatDisplayUpdatedAt(item.sessionExportedAt)
+                          : t("sources.platforms.not_available"),
+                      })}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      {t("sources.platforms.session_expires_at", {
+                        value: item.sessionExpiresAt
+                          ? formatDisplayUpdatedAt(item.sessionExpiresAt)
+                          : t("sources.platforms.not_available"),
                       })}
                     </Typography.Text>
                   </div>
@@ -1772,11 +2039,17 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
   const fallbackSalesIntelData = useMemo(() => createFallbackSalesIntelData(), []);
   const fallbackCompetitorData = useMemo(() => createFallbackCompetitorData(t), [t]);
   const fallbackRecruitmentLeadsData = useMemo(() => createFallbackRecruitmentLeadsData(), []);
+  const fallbackRecruitmentDispatcherData = useMemo(
+    () => createFallbackRecruitmentDispatcherData(),
+    []
+  );
   const [salesIntelData, setSalesIntelData] = useState<SalesIntelData>(fallbackSalesIntelData);
   const [competitorData, setCompetitorData] = useState<CompetitorData>(fallbackCompetitorData);
   const [recruitmentLeadsData, setRecruitmentLeadsData] = useState<RecruitmentLeadsPayload>(
     fallbackRecruitmentLeadsData
   );
+  const [recruitmentDispatcherData, setRecruitmentDispatcherData] =
+    useState<RecruitmentDispatcherPayload>(fallbackRecruitmentDispatcherData);
   const [adminIndex, setAdminIndex] = useState<ChinaAdminIndex>(fallbackAdminIndex);
   const [followUpRecords, setFollowUpRecords] = useState<FollowUpRecord[]>([]);
   const [companyProfiles, setCompanyProfiles] = useState<CompanyProfileRecord[]>([]);
@@ -1815,6 +2088,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         overviewStatsResult,
         recruitmentLeadsResult,
         healthResult,
+        dispatcherResult,
       ] = await Promise.allSettled([
         loadJsonWithFallback<SalesIntelData>(createRemoteOnlyDataSources("/api/sales/intel")),
         loadJsonWithFallback<CompetitorData>(
@@ -1848,6 +2122,11 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
         shouldLoadOperationalStatus
           ? loadJsonWithFallback<ApiHealthPayload>(createRemoteOnlyDataSources("/api/health"))
           : Promise.resolve(null),
+        shouldLoadOperationalStatus
+          ? loadJsonWithFallback<RecruitmentDispatcherPayload>(
+              createRemoteOnlyDataSources("/api/recruitment/dispatcher")
+            )
+          : Promise.resolve(fallbackRecruitmentDispatcherData),
       ]);
 
       if (!active) {
@@ -1894,6 +2173,11 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
           : fallbackRecruitmentLeadsData
       );
       setApiHealth(healthResult.status === "fulfilled" ? (healthResult.value ?? null) : null);
+      setRecruitmentDispatcherData(
+        dispatcherResult.status === "fulfilled"
+          ? dispatcherResult.value
+          : fallbackRecruitmentDispatcherData
+      );
       setIsInitialLoading(false);
     }
 
@@ -1911,6 +2195,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
       setCompanyDuplicates({ groups: [], decisions: [] });
       setOverviewStats(null);
       setRecruitmentLeadsData(fallbackRecruitmentLeadsData);
+      setRecruitmentDispatcherData(fallbackRecruitmentDispatcherData);
       setApiHealth(null);
       setIsInitialLoading(false);
     });
@@ -1918,7 +2203,13 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
     return () => {
       active = false;
     };
-  }, [fallbackCompetitorData, fallbackRecruitmentLeadsData, fallbackSalesIntelData, view]);
+  }, [
+    fallbackCompetitorData,
+    fallbackRecruitmentDispatcherData,
+    fallbackRecruitmentLeadsData,
+    fallbackSalesIntelData,
+    view,
+  ]);
 
   const visibleCompetitors = useMemo(() => {
     if (!selectedCities.length) {
@@ -2244,6 +2535,7 @@ export function RadarDashboardClient({ view }: { view: DashboardView }) {
             followUpRecords={followUpRecords}
             companyProfiles={companyProfiles}
             recruitmentLeadsData={recruitmentLeadsData}
+            recruitmentDispatcherData={recruitmentDispatcherData}
             apiHealth={apiHealth}
             overviewStats={overviewStats}
           />

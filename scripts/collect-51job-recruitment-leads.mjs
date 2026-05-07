@@ -130,8 +130,7 @@ function parseArgs(argv) {
   return {
     debugUrl: readOption(argv, "debug-url") || DEFAULT_DEBUG_URL,
     output:
-      readOption(argv, "output") ||
-      path.join(projectRoot, ".tmp", "51job-recruitment-leads.json"),
+      readOption(argv, "output") || path.join(projectRoot, ".tmp", "51job-recruitment-leads.json"),
     maxCompanies: Math.max(
       1,
       Math.min(Number.isFinite(maxCompanies) ? maxCompanies : DEFAULT_MAX_COMPANIES, 30)
@@ -243,7 +242,9 @@ function mergeCollectedJobs(previousJobs, currentJobs, fallbackPlatform, fallbac
       salary: normalizedJob.salary || existingJob.salary,
       publishedAt: normalizedJob.publishedAt || existingJob.publishedAt,
       url: normalizedJob.url || existingJob.url,
-      keywordHits: [...new Set([...(existingJob.keywordHits || []), ...(normalizedJob.keywordHits || [])])],
+      keywordHits: [
+        ...new Set([...(existingJob.keywordHits || []), ...(normalizedJob.keywordHits || [])]),
+      ],
       descriptionEvidence: normalizedJob.descriptionEvidence || existingJob.descriptionEvidence,
     });
   }
@@ -511,7 +512,15 @@ function mergeLead(lead, job, detail, keywordSet) {
   lead.leadStrength = buildLeadStrength(lead.matchedKeywords, jobTitle, description);
 }
 
-function buildPayload({ leads, cities, keywords, maxCompanies, platformStatus, queryLogs }) {
+function buildPayload({
+  leads,
+  cities,
+  keywords,
+  maxCompanies,
+  platformStatus,
+  queryLogs,
+  browserMeta,
+}) {
   const effectiveCompanyCount = leads.length;
   return {
     updatedAt: getShanghaiUpdatedAt(),
@@ -530,6 +539,14 @@ function buildPayload({ leads, cities, keywords, maxCompanies, platformStatus, q
         status: platformStatus,
         querySummary: queryLogs.join("；"),
         effectiveCompanyCount,
+        browserEndpoint: browserMeta.browserEndpoint,
+        browserMode: "cdp",
+        browserClosed: browserMeta.browserClosed,
+        sessionFileConfigured: false,
+        sessionExportedAt: "",
+        sessionExpiresAt: "",
+        authMode: "browser_context",
+        authState: platformStatus === "blocked" ? "blocked" : "public",
         note:
           platformStatus === "ok"
             ? "通过浏览器上下文访问搜索接口与职位详情页提取结构化招聘线索。"
@@ -566,7 +583,7 @@ class CdpClient {
 
   async closeTarget() {
     if (!this.targetId) {
-      return;
+      return true;
     }
 
     const endpoint = `${this.debugUrl}/json/close/${this.targetId}`;
@@ -575,8 +592,10 @@ class CdpClient {
       if (!response.ok) {
         response = await fetch(endpoint);
       }
+      return response.ok;
     } catch {
       // Ignore close failures so the main run result is preserved.
+      return false;
     } finally {
       this.targetId = "";
     }
@@ -683,7 +702,7 @@ class CdpClient {
       this.ws?.close();
     } finally {
       this.ws = null;
-      await this.closeTarget();
+      return await this.closeTarget();
     }
   }
 }
@@ -884,7 +903,9 @@ async function collectAllJobsForLead(cdp, lead, options) {
   );
   await cdp.navigate(buildSearchPageUrl(city, lead.companyName), SEARCH_WAIT_MS);
   const result = await cdp.evaluate(
-    searchExtractionExpression(buildSearchApiUrl(city, lead.companyName, options.maxAllJobsPerCompany))
+    searchExtractionExpression(
+      buildSearchApiUrl(city, lead.companyName, options.maxAllJobsPerCompany)
+    )
   );
 
   if (result?.blocked) {
@@ -967,10 +988,24 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const outputPath = normalizeOutputPath(options.output);
   const cdp = new CdpClient(options.debugUrl);
+  let payload = null;
 
   try {
     await cdp.connect();
-    const payload = await collectLeads(cdp, options);
+    payload = await collectLeads(cdp, options);
+    const browserClosed = await cdp.dispose();
+    payload = buildPayload({
+      leads: payload.leads,
+      cities: options.cities,
+      keywords: options.keywords,
+      maxCompanies: options.maxCompanies,
+      platformStatus: payload.platformCoverage?.[0]?.status || "limited",
+      queryLogs: payload.platformCoverage?.[0]?.querySummary?.split("；").filter(Boolean) || [],
+      browserMeta: {
+        browserEndpoint: options.debugUrl,
+        browserClosed,
+      },
+    });
 
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
@@ -981,7 +1016,9 @@ async function main() {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   } finally {
-    await cdp.dispose();
+    if (!payload) {
+      await cdp.dispose();
+    }
   }
 }
 
