@@ -633,7 +633,27 @@
     "metrics": {
       "signals": "历史线索",
       "jobs": "全部岗位",
-      "platforms": "来源平台"
+      "platforms": "来源平台",
+      "active_days": "活跃天数"
+    },
+    "trend": {
+      "title": "线索历史趋势",
+      "empty": "当前企业还没有可统计的历史趋势。",
+      "total": "总线索 {{count}}",
+      "report": "日报 {{count}}",
+      "recruitment": "招聘 {{count}}",
+      "high": "高强度 {{count}}"
+    },
+    "sources": {
+      "title": "来源平台对比",
+      "empty": "当前企业还没有可对比的来源平台。",
+      "signals": "线索 {{count}}",
+      "jobs": "岗位 {{count}}",
+      "latest": "最近同步：{{value}}"
+    },
+    "stage": {
+      "title": "跟进阶段时间线",
+      "no_next_action": "当前还没有下一步动作。"
     }
   },
   "sources": {

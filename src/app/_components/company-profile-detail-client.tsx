@@ -3,11 +3,23 @@
 import {
   ArrowLeftOutlined,
   BankOutlined,
+  BranchesOutlined,
   ClockCircleOutlined,
   FileSearchOutlined,
   ProfileOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Empty, Space, Spin, Statistic, Tag, Timeline, Typography } from "antd";
+import {
+  Button,
+  Card,
+  Empty,
+  Progress,
+  Space,
+  Spin,
+  Statistic,
+  Tag,
+  Timeline,
+  Typography,
+} from "antd";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +43,21 @@ type CompanyDetailData = {
   companyProfiles: CompanyProfileRecord[];
 };
 
+type TrendBucket = {
+  date: string;
+  total: number;
+  report: number;
+  recruitment: number;
+  high: number;
+};
+
+type SourceComparison = {
+  label: string;
+  signalCount: number;
+  jobCount: number;
+  latestAt: string;
+};
+
 function compactText(value: string) {
   return String(value || "")
     .replace(/\s+/g, " ")
@@ -43,6 +70,31 @@ function formatDisplayUpdatedAt(value: string) {
 
 function uniqueStrings(values: string[]) {
   return [...new Set(values.map((item) => compactText(item)).filter(Boolean))];
+}
+
+function splitSourceLabels(value: string) {
+  return uniqueStrings(
+    compactText(value)
+      .split(/[、,，]/u)
+      .map((item) => item.trim())
+  );
+}
+
+function getDateKey(value: string) {
+  const match = compactText(value).match(/^(\d{4}-\d{2}-\d{2})/u);
+  return match?.[1] ?? "";
+}
+
+function compareTimestampDesc(left: string, right: string) {
+  return compactText(right).localeCompare(compactText(left));
+}
+
+function getSignalTime(item: SalesIntelItem) {
+  return compactText(item.retrievedAt || item.publishedAt || "");
+}
+
+function getActiveDays(items: SalesIntelItem[]) {
+  return uniqueStrings(items.map((item) => getDateKey(getSignalTime(item))).filter(Boolean)).length;
 }
 
 function createFallbackSalesIntelData(): SalesIntelData {
@@ -104,6 +156,90 @@ function getSortText(item: SalesIntelItem) {
 
 function sortSignals(items: SalesIntelItem[]) {
   return [...items].sort((left, right) => getSortText(right).localeCompare(getSortText(left)));
+}
+
+function buildTrendBuckets(items: SalesIntelItem[]) {
+  const bucketMap = new Map<string, TrendBucket>();
+
+  for (const item of items) {
+    const date = getDateKey(getSignalTime(item));
+    if (!date) {
+      continue;
+    }
+
+    const bucket = bucketMap.get(date) ?? {
+      date,
+      total: 0,
+      report: 0,
+      recruitment: 0,
+      high: 0,
+    };
+
+    bucket.total += 1;
+    if (item.kind === "report") {
+      bucket.report += 1;
+    } else {
+      bucket.recruitment += 1;
+    }
+
+    if (item.strength === "高") {
+      bucket.high += 1;
+    }
+
+    bucketMap.set(date, bucket);
+  }
+
+  return [...bucketMap.values()].sort((left, right) =>
+    compareTimestampDesc(`${left.date} 23:59:59`, `${right.date} 23:59:59`)
+  );
+}
+
+function buildSourceComparison(entry: CompanyLibraryEntry, jobs: SalesIntelMatchedJob[]) {
+  const sourceMap = new Map<string, SourceComparison>();
+
+  function ensureSource(label: string) {
+    const sourceLabel = compactText(label);
+    const source = sourceMap.get(sourceLabel) ?? {
+      label: sourceLabel,
+      signalCount: 0,
+      jobCount: 0,
+      latestAt: "",
+    };
+    sourceMap.set(sourceLabel, source);
+    return source;
+  }
+
+  for (const item of entry.items) {
+    const labels = splitSourceLabels(item.sourceLabel);
+
+    for (const label of labels) {
+      const source = ensureSource(label);
+      source.signalCount += 1;
+      const signalTime = getSignalTime(item);
+      if (signalTime && compareTimestampDesc(source.latestAt, signalTime) > 0) {
+        source.latestAt = signalTime;
+      }
+    }
+  }
+
+  for (const job of jobs) {
+    const label = compactText(job.platform);
+    if (!label) {
+      continue;
+    }
+
+    const source = ensureSource(label);
+    source.jobCount += 1;
+    const publishedAt = compactText(job.publishedAt);
+    if (publishedAt && compareTimestampDesc(source.latestAt, publishedAt) > 0) {
+      source.latestAt = publishedAt;
+    }
+  }
+
+  return [...sourceMap.values()].sort((left, right) => {
+    const countDiff = right.signalCount + right.jobCount - (left.signalCount + left.jobCount);
+    return countDiff || compareTimestampDesc(left.latestAt, right.latestAt);
+  });
 }
 
 function buildRecordOnlyEntry(record: FollowUpRecord, summary: string): CompanyLibraryEntry {
@@ -227,9 +363,100 @@ function JobList({ jobs }: { jobs: SalesIntelMatchedJob[] }) {
   );
 }
 
+function TrendPanel({ buckets }: { buckets: TrendBucket[] }) {
+  const { t } = useTranslation();
+
+  if (!buckets.length) {
+    return <Empty description={t("company_detail.trend.empty")} />;
+  }
+
+  const maxTotal = Math.max(...buckets.map((bucket) => bucket.total), 1);
+
+  return (
+    <div className="space-y-3">
+      {buckets.map((bucket) => (
+        <div
+          key={bucket.date}
+          className="rounded-[1.1rem] border border-(--color-line) bg-white/70 px-4 py-3"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Typography.Text strong>{bucket.date}</Typography.Text>
+            <div className="flex flex-wrap gap-2">
+              <Tag>{t("company_detail.trend.total", { count: bucket.total })}</Tag>
+              {bucket.report ? (
+                <Tag>{t("company_detail.trend.report", { count: bucket.report })}</Tag>
+              ) : null}
+              {bucket.recruitment ? (
+                <Tag>{t("company_detail.trend.recruitment", { count: bucket.recruitment })}</Tag>
+              ) : null}
+              {bucket.high ? (
+                <Tag color="red">{t("company_detail.trend.high", { count: bucket.high })}</Tag>
+              ) : null}
+            </div>
+          </div>
+          <Progress
+            percent={Math.round((bucket.total / maxTotal) * 100)}
+            showInfo={false}
+            strokeColor="var(--color-accent)"
+            trailColor="rgba(120, 84, 45, 0.14)"
+            className="mt-2"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SourceComparisonPanel({ sources }: { sources: SourceComparison[] }) {
+  const { t } = useTranslation();
+
+  if (!sources.length) {
+    return <Empty description={t("company_detail.sources.empty")} />;
+  }
+
+  const maxTotal = Math.max(...sources.map((source) => source.signalCount + source.jobCount), 1);
+
+  return (
+    <div className="space-y-3">
+      {sources.map((source) => {
+        const total = source.signalCount + source.jobCount;
+
+        return (
+          <div
+            key={source.label}
+            className="rounded-[1.1rem] border border-(--color-line) bg-white/70 px-4 py-3"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Typography.Text strong>{source.label}</Typography.Text>
+              <div className="flex flex-wrap gap-2">
+                <Tag>{t("company_detail.sources.signals", { count: source.signalCount })}</Tag>
+                <Tag>{t("company_detail.sources.jobs", { count: source.jobCount })}</Tag>
+              </div>
+            </div>
+            <Progress
+              percent={Math.round((total / maxTotal) * 100)}
+              showInfo={false}
+              strokeColor="var(--color-accent)"
+              trailColor="rgba(120, 84, 45, 0.14)"
+              className="mt-2"
+            />
+            <Typography.Text type="secondary" className="mt-1 block">
+              {t("company_detail.sources.latest", {
+                value: formatDisplayUpdatedAt(source.latestAt) || t("sales_intel.not_synced"),
+              })}
+            </Typography.Text>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function FollowUpTimeline({ record }: { record?: FollowUpRecord }) {
   const { t } = useTranslation();
-  const events = record?.events ?? [];
+  const events = [...(record?.events ?? [])].sort((left, right) =>
+    compareTimestampDesc(left.followedAt || left.createdAt, right.followedAt || right.createdAt)
+  );
 
   if (!record) {
     return <Empty description={t("company_detail.follow_empty")} />;
@@ -257,6 +484,18 @@ function FollowUpTimeline({ record }: { record?: FollowUpRecord }) {
           }
         />
       </div>
+      <div className="rounded-[1.1rem] border border-(--color-line) bg-white/70 px-4 py-3">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <Tag color="blue">{t(`follow_ups.stages.${record.stage}`)}</Tag>
+          {record.dealStage ? <Tag>{t(`follow_ups.deal_stages.${record.dealStage}`)}</Tag> : null}
+          {record.reminderStatus ? (
+            <Tag>{t(`follow_ups.values.reminder_${record.reminderStatus}`)}</Tag>
+          ) : null}
+        </div>
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          {record.nextAction || record.note || t("company_detail.stage.no_next_action")}
+        </Typography.Paragraph>
+      </div>
       {events.length ? (
         <Timeline
           items={events.map((event) => ({
@@ -268,6 +507,12 @@ function FollowUpTimeline({ record }: { record?: FollowUpRecord }) {
                   </Typography.Text>
                   {event.owner ? <Tag>{event.owner}</Tag> : null}
                   {event.stage ? <Tag>{t(`follow_ups.stages.${event.stage}`)}</Tag> : null}
+                  {event.contactResult ? (
+                    <Tag>{t(`follow_ups.contact_results.${event.contactResult}`)}</Tag>
+                  ) : null}
+                  {event.dealStage ? (
+                    <Tag>{t(`follow_ups.deal_stages.${event.dealStage}`)}</Tag>
+                  ) : null}
                 </div>
                 {event.nextAction ? (
                   <Typography.Paragraph style={{ marginBottom: 0 }}>
@@ -362,6 +607,9 @@ export function CompanyProfileDetailClient() {
   const followUpRecord = data.followUpRecords.find((item) => item.companyId === companyId);
   const jobs = collectCompanyJobs(activeEntry);
   const sourcePlatforms = activeEntry ? uniqueStrings(activeEntry.sourcePlatforms) : [];
+  const trendBuckets = activeEntry ? buildTrendBuckets(activeEntry.items) : [];
+  const sourceComparison = activeEntry ? buildSourceComparison(activeEntry, jobs) : [];
+  const activeDays = activeEntry ? getActiveDays(activeEntry.items) : 0;
 
   if (isLoading) {
     return (
@@ -424,7 +672,7 @@ export function CompanyProfileDetailClient() {
         </div>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <Space size={12}>
             <FileSearchOutlined className="text-lg text-(--color-accent)" />
@@ -447,6 +695,12 @@ export function CompanyProfileDetailClient() {
               title={t("company_detail.metrics.platforms")}
               value={sourcePlatforms.length}
             />
+          </Space>
+        </Card>
+        <Card>
+          <Space size={12}>
+            <BranchesOutlined className="text-lg text-(--color-accent)" />
+            <Statistic title={t("company_detail.metrics.active_days")} value={activeDays} />
           </Space>
         </Card>
       </div>
@@ -499,6 +753,15 @@ export function CompanyProfileDetailClient() {
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Card title={t("company_detail.trend.title")}>
+          <TrendPanel buckets={trendBuckets} />
+        </Card>
+        <Card title={t("company_detail.sources.title")}>
+          <SourceComparisonPanel sources={sourceComparison} />
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card title={t("company_detail.signals_title")}>
           <SignalList items={activeEntry.items} />
         </Card>
@@ -507,7 +770,7 @@ export function CompanyProfileDetailClient() {
         </Card>
       </div>
 
-      <Card title={t("company_detail.follow_title")}>
+      <Card title={t("company_detail.stage.title")}>
         <FollowUpTimeline record={followUpRecord} />
       </Card>
     </div>
